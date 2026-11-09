@@ -37,36 +37,6 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _hideConfirmPassword = true;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final tokenManager = context.read<AuthTokenManager>();
-      final hasToken = await tokenManager.hasAccessToken();
-      if (hasToken && mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
-        return;
-      }
-      final auth = context.read<AuthController>();
-      if (auth.isAuthenticated && mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
-      }
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final auth = context.watch<AuthController>();
-    if (auth.isAuthenticated) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
-        }
-      });
-    }
-  }
-
-  @override
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
@@ -250,9 +220,7 @@ class _AuthScreenState extends State<AuthScreen> {
       });
       return const SizedBox(
         height: 200,
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -332,21 +300,6 @@ class _AuthScreenState extends State<AuthScreen> {
           onPressed: _signIn,
         ),
       ],
-    );
-  }
-
-  Widget _authenticatedContent(AuthController auth) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
-      }
-    });
-
-    return const SizedBox(
-      height: 200,
-      child: Center(
-        child: CircularProgressIndicator(),
-      ),
     );
   }
 

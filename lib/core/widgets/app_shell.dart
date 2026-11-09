@@ -65,8 +65,10 @@ class _AppShellState extends State<AppShell> {
   void _toggleNotifications() =>
       setState(() => _showNotifications = !_showNotifications);
 
-  void _logout() {
-    context.read<AuthController>().signOut();
+  Future<void> _logout() async {
+    await context.read<AuthController>().signOut();
+
+    if (!mounted) return;
 
     Navigator.of(context)
         .pushNamedAndRemoveUntil(AppRouter.auth, (route) => false);
