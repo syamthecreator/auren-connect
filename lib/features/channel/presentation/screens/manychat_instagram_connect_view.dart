@@ -51,8 +51,21 @@ class _ManyChatInstagramConnectViewState
   void _listenForMetaCallback() {
     try {
       _messageSub = html.window.onMessage.listen((event) {
-        if (event.data is Map &&
-            event.data['type'] == 'AUREN_INSTAGRAM_CONNECTED') {
+        final data = event.data;
+        bool isConnected = false;
+        try {
+          if (data == 'AUREN_INSTAGRAM_CONNECTED') {
+            isConnected = true;
+          } else if (data is Map &&
+              data['type'] == 'AUREN_INSTAGRAM_CONNECTED') {
+            isConnected = true;
+          } else if (data != null &&
+              data.toString().contains('AUREN_INSTAGRAM_CONNECTED')) {
+            isConnected = true;
+          }
+        } catch (_) {}
+
+        if (isConnected) {
           _handleConnectionSuccess();
         }
       });
