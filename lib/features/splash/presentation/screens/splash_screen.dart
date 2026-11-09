@@ -1,4 +1,6 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -84,6 +86,36 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _startFlow() async {
+    final uri = Uri.base;
+    final isOAuthReturn = uri.queryParameters['tab'] == 'channel' ||
+        uri.queryParameters.containsKey('connected');
+
+    if (isOAuthReturn) {
+      // If this is a popup window that was redirected, notify opener and close
+      try {
+        if (html.window.opener != null && !html.window.opener!.closed!) {
+          html.window.opener!.postMessage('AUREN_INSTAGRAM_CONNECTED', '*');
+          html.window.close();
+          return;
+        }
+      } catch (_) {}
+
+      // If cannot close or is primary tab, proceed straight to dashboard without animation delay
+      final tokenManager = context.read<AuthTokenManager>();
+      final hasToken = await tokenManager.hasAccessToken();
+      if (!mounted) return;
+
+      if (hasToken) {
+        final auth = context.read<AuthController>();
+        if (!auth.isAuthenticated) {
+          await auth.initialize();
+        }
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+        return;
+      }
+    }
+
     _entryController.forward();
     _progressController.forward();
 

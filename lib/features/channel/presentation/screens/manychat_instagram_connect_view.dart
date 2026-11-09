@@ -78,10 +78,8 @@ class _ManyChatInstagramConnectViewState
       _authPopup?.close();
     } catch (_) {}
 
-    if (!mounted) return;
-
-    final controller = context.read<ChannelController>();
-    await controller.loadChannels();
+    // Immediately trigger onConnected to transition parent back to ChannelScreen!
+    widget.onConnected();
 
     if (!mounted) return;
     setState(() {
@@ -89,8 +87,11 @@ class _ManyChatInstagramConnectViewState
       _isAwaitingMeta = false;
     });
 
+    final controller = context.read<ChannelController>();
+    await controller.loadChannels();
+
+    if (!mounted) return;
     AppSnackBar.success(context, 'Instagram account connected successfully!');
-    widget.onConnected();
   }
 
   Future<void> _connectViaMeta() async {
@@ -142,8 +143,10 @@ class _ManyChatInstagramConnectViewState
   void _startPolling() {
     _pollingTimer?.cancel();
     int count = 0;
+    final initialCount =
+        context.read<ChannelController>().instagramAccounts.length;
 
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       count++;
       if (!mounted) {
         timer.cancel();
@@ -155,10 +158,12 @@ class _ManyChatInstagramConnectViewState
 
       if (!mounted) return;
 
-      if (controller.isInstagramConnected) {
+      final currentCount = controller.instagramAccounts.length;
+      if ((initialCount == 0 && controller.isInstagramConnected) ||
+          currentCount > initialCount) {
         timer.cancel();
         _handleConnectionSuccess();
-      } else if (count >= 80) {
+      } else if (count >= 120) {
         // Stop polling after 4 minutes
         timer.cancel();
         setState(() => _isAwaitingMeta = false);
