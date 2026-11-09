@@ -36,6 +36,17 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _hideConfirmPassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthController>();
+      if (auth.isAuthenticated && mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
@@ -209,11 +220,18 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _formPanel() {
     final auth = context.watch<AuthController>();
 
-    // If authenticated, display the connected workspace status view
+    // If authenticated, display loading while entering workspace
     if (auth.isAuthenticated) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-        child: Center(child: _authenticatedContent(auth)),
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+        }
+      });
+      return const SizedBox(
+        height: 200,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 

@@ -26,6 +26,19 @@ class _AppShellState extends State<AppShell> {
   bool? _collapsedOverride;
   bool _showNotifications = false;
 
+  @override
+  void initState() {
+    super.initState();
+    try {
+      final uri = Uri.base;
+      if (uri.queryParameters['tab'] == 'channel' ||
+          uri.queryParameters.containsKey('connected') ||
+          uri.fragment.contains('channel')) {
+        _current = NavDestination.channel;
+      }
+    } catch (_) {}
+  }
+
   bool get _collapsed =>
       _collapsedOverride ?? MediaQuery.of(context).size.width < 1000;
 
