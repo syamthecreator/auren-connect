@@ -43,27 +43,27 @@ class _ChannelScreenState extends State<ChannelScreen> {
   }
 
   // WhatsApp Channel State
-  bool _waConnected = true;
-  bool _waActive = true;
-  final String _waPhone = '+91 98765 43210';
+  bool _waConnected = false;
+  bool _waActive = false;
+  final String _waPhone = 'Not connected';
   final String _waDisplayName = 'Auren Studio';
-  final String _waWabaId = '109284719203841';
-  final String _waPhoneId = '103948271039482';
-  final String _waQuality = 'High';
-  final int _waDailyUsed = 1842;
-  final int _waDailyLimit = 10000;
-  bool _waWebhookActive = true;
-  bool _waTemplatesActive = true;
-  bool _waAutoResponder = true;
+  final String _waWabaId = 'Not configured';
+  final String _waPhoneId = 'Not configured';
+  final String _waQuality = 'Pending Setup';
+  final int _waDailyUsed = 0;
+  final int _waDailyLimit = 1000;
+  bool _waWebhookActive = false;
+  bool _waTemplatesActive = false;
+  bool _waAutoResponder = false;
 
   // Instagram Channel State
   bool _igActive = true;
-  final String _igHandle = '@auren.studio';
-  final String _igAccountName = 'Auren Design Studio';
-  final String _igPageName = 'Auren Studio Official';
+  final String _igHandle = '@aurenessence.in';
+  final String _igAccountName = 'Auren Essence';
+  final String _igPageName = 'Auren Essence Business';
   final String _igPageId = '104928371948201';
-  final String _igAccountId = '17841400293817290';
-  final int _igDmsToday = 602;
+  final String _igAccountId = '17841415634351143';
+  final int _igDmsToday = 0;
   bool _igDirectMessages = true;
   bool _igStoryMentions = true;
   bool _igCommentTriggers = true;
@@ -648,7 +648,11 @@ class _ChannelScreenState extends State<ChannelScreen> {
 
         // 3. Filter Chips
         StudioChips(
-          options: const ['All channels (2)', 'WhatsApp', 'Instagram'],
+          options: [
+            'All channels (${(isIgConnected ? 1 : 0) + (_waConnected ? 1 : 0)})',
+            'WhatsApp',
+            'Instagram',
+          ],
           selected: _selectedFilter,
           onChanged: (idx) => setState(() => _selectedFilter = idx),
         ),
@@ -662,8 +666,8 @@ class _ChannelScreenState extends State<ChannelScreen> {
             if (_selectedFilter == 0 || _selectedFilter == 1)
               _WhatsAppChannelCard(
                 connected: _waConnected,
-                active: _waActive,
-                phone: _waPhone,
+                active: _waConnected && _waActive,
+                phone: _waConnected ? _waPhone : 'Not connected',
                 displayName: _waDisplayName,
                 wabaId: _waWabaId,
                 phoneId: _waPhoneId,
@@ -696,16 +700,16 @@ class _ChannelScreenState extends State<ChannelScreen> {
             if (_selectedFilter == 0 || _selectedFilter == 2)
               _InstagramChannelCard(
                 connected: isIgConnected,
-                active: _igActive,
+                active: isIgConnected && _igActive,
                 handle: currentIgHandle,
                 accountName: igAccount?.username ?? _igAccountName,
                 pageName: _igPageName,
                 pageId: _igPageId,
                 accountId: currentIgAccountId,
-                dmsToday: _igDmsToday,
-                directMessages: _igDirectMessages,
-                storyMentions: _igStoryMentions,
-                commentTriggers: _igCommentTriggers,
+                dmsToday: isIgConnected ? _igDmsToday : 0,
+                directMessages: isIgConnected && _igDirectMessages,
+                storyMentions: isIgConnected && _igStoryMentions,
+                commentTriggers: isIgConnected && _igCommentTriggers,
                 onToggleActive: (val) => setState(() => _igActive = val),
                 onToggleDms: (val) => setState(() => _igDirectMessages = val),
                 onToggleStories: (val) =>
