@@ -9,6 +9,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../core/constants/asset_constants.dart';
 import '../../../../core/network/auth_token_manager.dart';
+import '../../../../core/utils/shell_scope.dart';
 import '../../../auth/controllers/auth_controller.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -87,8 +88,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _startFlow() async {
     final uri = Uri.base;
+    final href = html.window.location.href;
     final isOAuthReturn = uri.queryParameters['tab'] == 'channel' ||
-        uri.queryParameters.containsKey('connected');
+        uri.queryParameters.containsKey('connected') ||
+        uri.fragment.contains('channel') ||
+        href.contains('tab=channel') ||
+        href.contains('connected=true');
 
     if (isOAuthReturn) {
       // If this is a popup window that was redirected, notify opener and close
@@ -100,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
         }
       } catch (_) {}
 
-      // If cannot close or is primary tab, proceed straight to dashboard without animation delay
+      // If cannot close or is primary tab, proceed straight to dashboard on Channel tab
       final tokenManager = context.read<AuthTokenManager>();
       final hasToken = await tokenManager.hasAccessToken();
       if (!mounted) return;
@@ -111,7 +116,10 @@ class _SplashScreenState extends State<SplashScreen>
           await auth.initialize();
         }
         if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+        Navigator.of(context).pushReplacementNamed(
+          AppRouter.dashboard,
+          arguments: NavDestination.channel,
+        );
         return;
       }
     }
@@ -134,7 +142,10 @@ class _SplashScreenState extends State<SplashScreen>
         await auth.initialize();
       }
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+      Navigator.of(context).pushReplacementNamed(
+        AppRouter.dashboard,
+        arguments: isOAuthReturn ? NavDestination.channel : null,
+      );
     } else {
       Navigator.of(context).pushReplacementNamed(AppRouter.auth);
     }

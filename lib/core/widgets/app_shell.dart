@@ -1,3 +1,6 @@
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+
 import 'package:auren_connect/app/routes/app_router.dart';
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/core/widgets/app_sidebar.dart';
@@ -14,14 +17,16 @@ import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.initialDestination});
+
+  final NavDestination? initialDestination;
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
-  NavDestination _current = NavDestination.overview;
+  late NavDestination _current;
 
   bool? _collapsedOverride;
   bool _showNotifications = false;
@@ -29,14 +34,22 @@ class _AppShellState extends State<AppShell> {
   @override
   void initState() {
     super.initState();
-    try {
-      final uri = Uri.base;
-      if (uri.queryParameters['tab'] == 'channel' ||
-          uri.queryParameters.containsKey('connected') ||
-          uri.fragment.contains('channel')) {
-        _current = NavDestination.channel;
-      }
-    } catch (_) {}
+    if (widget.initialDestination != null) {
+      _current = widget.initialDestination!;
+    } else {
+      _current = NavDestination.overview;
+      try {
+        final uri = Uri.base;
+        final href = html.window.location.href;
+        if (uri.queryParameters['tab'] == 'channel' ||
+            uri.queryParameters.containsKey('connected') ||
+            uri.fragment.contains('channel') ||
+            href.contains('tab=channel') ||
+            href.contains('connected=true')) {
+          _current = NavDestination.channel;
+        }
+      } catch (_) {}
+    }
   }
 
   bool get _collapsed =>

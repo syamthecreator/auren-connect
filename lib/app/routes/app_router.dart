@@ -1,3 +1,4 @@
+import 'package:auren_connect/core/utils/shell_scope.dart';
 import 'package:auren_connect/core/widgets/app_shell.dart';
 import 'package:auren_connect/features/auth/presentation/screens/login_screen.dart';
 import 'package:auren_connect/features/splash/presentation/screens/splash_screen.dart';
@@ -19,7 +20,11 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const AuthScreen());
 
       case dashboard:
-        return MaterialPageRoute(builder: (_) => const AppShell());
+        final initialDestination =
+            routeSettings.arguments as NavDestination?;
+        return MaterialPageRoute(
+          builder: (_) => AppShell(initialDestination: initialDestination),
+        );
 
       default:
         return MaterialPageRoute(builder: (_) => const SplashScreen());
