@@ -48,7 +48,7 @@ class AurenConnectApp extends StatelessWidget {
         themeMode: ThemeMode.dark,
         theme: AppTheme.darkTheme,
         darkTheme: AppTheme.darkTheme,
-        initialRoute: AppRouter.auth,
+        initialRoute: AppRouter.splash,
         onGenerateRoute: AppRouter.generateRoute,
       ),
     );
