@@ -1,5 +1,4 @@
 import 'package:auren_connect/app/routes/app_router.dart';
-import 'package:auren_connect/core/network/auth_token_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
