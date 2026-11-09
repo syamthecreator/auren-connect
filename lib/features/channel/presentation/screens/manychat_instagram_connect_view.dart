@@ -61,7 +61,7 @@ class _ManyChatInstagramConnectViewState
 
   Future<void> _handleConnectionSuccess() async {
     _pollingTimer?.cancel();
-    _authPopup?.close();
+    // Keep popup open until the user manually closes it
     if (!mounted) return;
 
     final controller = context.read<ChannelController>();
