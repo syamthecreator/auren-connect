@@ -1,4 +1,5 @@
 import 'package:auren_connect/app/routes/app_router.dart';
+import 'package:auren_connect/core/network/auth_token_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -38,12 +39,31 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final tokenManager = context.read<AuthTokenManager>();
+      final hasToken = await tokenManager.hasAccessToken();
+      if (hasToken && mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+        return;
+      }
       final auth = context.read<AuthController>();
       if (auth.isAuthenticated && mounted) {
         Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.watch<AuthController>();
+    if (auth.isAuthenticated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+        }
+      });
+    }
   }
 
   @override
@@ -68,6 +88,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
 
     if (ok) {
+      Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
     } else if (auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -315,104 +336,17 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _authenticatedContent(AuthController auth) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.paletteNeonCyan, width: 2),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.paletteNeonCyan.withValues(alpha: 0.3),
-                blurRadius: 20,
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(
-              RemixIcons.check_line,
-              color: AppColors.paletteNeonCyan,
-              size: 32,
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Welcome, ${auth.userRole ?? 'Creator'}!',
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          auth.userEmail ?? '',
-          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.paletteNeonCyan.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.paletteNeonCyan.withValues(alpha: 0.4),
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              CircleAvatar(
-                radius: 4,
-                backgroundColor: AppColors.paletteNeonCyan,
-              ),
-              SizedBox(width: 6),
-              Text(
-                'Workspace Online • Connected',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.paletteNeonCyan,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 28),
-        AuthButton(
-          label: 'Launch Automation Studio',
-          icon: RemixIcons.login_box_line,
-          iconAfter: true,
-          gradient: AppColors.darkGradient,
-          onPressed: () {
-            Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+      }
+    });
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                backgroundColor: AppColors.surfaceVariant,
-                content: Text(
-                  'Entering aurenConnect Automation Studio...',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
-        AuthTextLink(
-          icon: RemixIcons.arrow_left_line,
-          label: 'Sign Out / Switch Account',
-          onTap: () {
-            auth.signOut();
-          },
-        ),
-      ],
+    return const SizedBox(
+      height: 200,
+      child: Center(
+        child: CircularProgressIndicator(),
+      ),
     );
   }
 
