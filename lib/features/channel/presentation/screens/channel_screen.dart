@@ -15,7 +15,11 @@ import 'package:auren_connect/core/widgets/studio_pill.dart';
 import 'package:auren_connect/features/overview/presentation/widget/progress_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
+
+import '../../controller/channel_controller.dart';
+import 'manychat_instagram_connect_view.dart';
 
 class ChannelScreen extends StatefulWidget {
   const ChannelScreen({super.key});
@@ -28,6 +32,15 @@ class _ChannelScreenState extends State<ChannelScreen> {
   int _selectedFilter = 0; // 0: All, 1: WhatsApp, 2: Instagram
   bool _isSyncing = false;
   bool _isTestingWebhook = false;
+  bool _showInstagramConnectView = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ChannelController>().loadChannels();
+    });
+  }
 
   // WhatsApp Channel State
   bool _waConnected = true;
@@ -44,7 +57,6 @@ class _ChannelScreenState extends State<ChannelScreen> {
   bool _waAutoResponder = true;
 
   // Instagram Channel State
-  bool _igConnected = true;
   bool _igActive = true;
   final String _igHandle = '@auren.studio';
   final String _igAccountName = 'Auren Design Studio';
@@ -69,12 +81,67 @@ class _ChannelScreenState extends State<ChannelScreen> {
 
   Future<void> _syncChannels() async {
     setState(() => _isSyncing = true);
-    await Future.delayed(const Duration(milliseconds: 900));
+    await context.read<ChannelController>().syncChannels();
     if (!mounted) return;
     setState(() => _isSyncing = false);
     AppSnackBar.success(
       context,
       'Channels successfully synchronized with Meta Cloud API (v21.0)',
+    );
+  }
+
+  void _showInstagramDisconnectDialog(String channelId, String handle) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: Row(
+          children: [
+            const StudioIconBox(
+              RemixIcons.error_warning_line,
+              AppColors.error,
+              size: 38,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Disconnect Instagram?',
+                style: AppTextStyles.t(17, w: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to disconnect $handle? Real-time comment-to-DM triggers and direct messaging automations will stop listening.',
+          style: AppTextStyles.t(13, c: AppColors.textSecondary, h: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: AppTextStyles.t(13.5, c: AppColors.textSecondary),
+            ),
+          ),
+          GradientButton(
+            label: 'Disconnect',
+            icon: RemixIcons.shut_down_line,
+            onTap: () async {
+              Navigator.of(ctx).pop();
+              final ok = await context
+                  .read<ChannelController>()
+                  .disconnectInstagram(channelId);
+              if (ok && mounted) {
+                AppSnackBar.info(context, '$handle disconnected successfully');
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -512,19 +579,18 @@ class _ChannelScreenState extends State<ChannelScreen> {
                 icon: RemixIcons.login_box_line,
                 onTap: () {
                   Navigator.of(ctx).pop();
-                  setState(() {
-                    if (isWa) {
+                  if (isWa) {
+                    setState(() {
                       _waConnected = true;
                       _waActive = true;
-                    } else {
-                      _igConnected = true;
-                      _igActive = true;
-                    }
-                  });
-                  AppSnackBar.success(
-                    context,
-                    '${isWa ? 'WhatsApp' : 'Instagram'} channel connected successfully!',
-                  );
+                    });
+                    AppSnackBar.success(
+                      context,
+                      'WhatsApp channel connected successfully!',
+                    );
+                  } else {
+                    setState(() => _showInstagramConnectView = true);
+                  }
                 },
               ),
             ],
@@ -536,6 +602,23 @@ class _ChannelScreenState extends State<ChannelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showInstagramConnectView) {
+      return ManyChatInstagramConnectView(
+        onBack: () => setState(() => _showInstagramConnectView = false),
+        onConnected: () => setState(() => _showInstagramConnectView = false),
+      );
+    }
+
+    final channelController = context.watch<ChannelController>();
+    final isIgConnected = channelController.isInstagramConnected;
+    final igAccount = channelController.primaryInstagramAccount;
+    final currentIgHandle =
+        igAccount?.displayHandle ??
+        (isIgConnected ? _igHandle : 'Not connected');
+    final currentIgAccountId =
+        igAccount?.instagramUserId ??
+        (isIgConnected ? _igAccountId : 'Not linked');
+
     return StudioPage(
       children: [
         // 1. Top Action Bar
@@ -557,9 +640,9 @@ class _ChannelScreenState extends State<ChannelScreen> {
         // 2. Hero Overview Card
         _ChannelHeroBanner(
           waConnected: _waConnected && _waActive,
-          igConnected: _igConnected && _igActive,
+          igConnected: isIgConnected && _igActive,
           waPhone: _waPhone,
-          igHandle: _igHandle,
+          igHandle: currentIgHandle,
           onConnectTap: _showConnectChannelDialog,
         ),
 
@@ -612,13 +695,13 @@ class _ChannelScreenState extends State<ChannelScreen> {
               ),
             if (_selectedFilter == 0 || _selectedFilter == 2)
               _InstagramChannelCard(
-                connected: _igConnected,
+                connected: isIgConnected,
                 active: _igActive,
-                handle: _igHandle,
-                accountName: _igAccountName,
+                handle: currentIgHandle,
+                accountName: igAccount?.username ?? _igAccountName,
                 pageName: _igPageName,
                 pageId: _igPageId,
-                accountId: _igAccountId,
+                accountId: currentIgAccountId,
                 dmsToday: _igDmsToday,
                 directMessages: _igDirectMessages,
                 storyMentions: _igStoryMentions,
@@ -632,13 +715,14 @@ class _ChannelScreenState extends State<ChannelScreen> {
                 onTestMessage: () => _showTestMessageDialog('Instagram'),
                 onConfigure: () => _showConfigureDialog('Instagram'),
                 onToggleConnect: () {
-                  setState(() => _igConnected = !_igConnected);
-                  AppSnackBar.info(
-                    context,
-                    _igConnected
-                        ? 'Instagram reconnected'
-                        : 'Instagram disconnected',
-                  );
+                  if (isIgConnected && igAccount != null) {
+                    _showInstagramDisconnectDialog(
+                      igAccount.id,
+                      currentIgHandle,
+                    );
+                  } else {
+                    setState(() => _showInstagramConnectView = true);
+                  }
                 },
                 onCopyId: (val) => _copyToClipboard(val, 'Instagram ID'),
               ),

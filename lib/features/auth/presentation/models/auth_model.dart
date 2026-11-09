@@ -7,6 +7,7 @@ class AuthModel {
   const AuthModel({
     this.step = AuthStep.signIn,
     this.isLoading = false,
+    this.isInitializing = true,
     this.secondsLeft = 0,
     this.isAuthenticated = false,
     this.userEmail,
@@ -15,9 +16,7 @@ class AuthModel {
     this.successMessage,
   });
 
-  // Default credentials for direct one-tap authentication
-  static const String defaultEmail = 'aurenthecreator@gmail.com';
-  static const String defaultPassword = 'auren123';
+  final bool isInitializing;
 
   final AuthStep step;
   final bool isLoading;
@@ -39,6 +38,7 @@ class AuthModel {
   AuthModel copyWith({
     AuthStep? step,
     bool? isLoading,
+    bool? isInitializing,
     int? secondsLeft,
     bool? isAuthenticated,
     String? userEmail,
@@ -52,6 +52,7 @@ class AuthModel {
     return AuthModel(
       step: step ?? this.step,
       isLoading: isLoading ?? this.isLoading,
+      isInitializing: isInitializing ?? this.isInitializing,
       secondsLeft: secondsLeft ?? this.secondsLeft,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       userEmail: userEmail ?? this.userEmail,

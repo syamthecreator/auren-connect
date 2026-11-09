@@ -1,22 +1,18 @@
 import 'dart:async';
 
-import 'package:auren_connect/core/services/auth_api_service.dart';
+import 'package:auren_connect/core/network/api_client.dart';
 import 'package:flutter/foundation.dart';
+
+import 'package:auren_connect/core/services/auth_api_service.dart';
 
 import '../presentation/models/auth_model.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController() : _model = const AuthModel();
-  final AuthApiService _authApiService = AuthApiService();
+  AuthController({required this._authApiService}) : _model = const AuthModel();
 
-  String? _accessToken;
-  String? _refreshToken;
-
-  String? get accessToken => _accessToken;
-  String? get refreshToken => _refreshToken;
+  final AuthApiService _authApiService;
 
   AuthModel _model;
-  Timer? _timer;
 
   AuthModel get model => _model;
   AuthStep get step => _model.step;
@@ -40,21 +36,45 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _startTimer() {
-    _timer?.cancel();
-    _model = _model.copyWith(secondsLeft: 60);
-    notifyListeners();
+  Future<void> initialize() async {
+    try {
+      final hasToken = await _authApiService.hasAccessToken();
 
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_model.secondsLeft > 1) {
-        _model = _model.copyWith(secondsLeft: _model.secondsLeft - 1);
+      debugPrint('AUTH INIT: Has access token = $hasToken');
+
+      if (!hasToken) {
+        _model = const AuthModel();
         notifyListeners();
-      } else {
-        _model = _model.copyWith(secondsLeft: 0);
-        timer.cancel();
-        notifyListeners();
+        return;
       }
-    });
+
+      final response = await _authApiService.getProfile();
+      final user = response['user'] as Map<String, dynamic>;
+
+      debugPrint('AUTH INIT: Profile restored = ${user['email']}');
+
+      _model = _model.copyWith(
+        isAuthenticated: true,
+        userEmail: user['email'] as String?,
+        userRole: 'Creator',
+        clearError: true,
+        clearSuccess: true,
+      );
+    } on ApiException catch (error) {
+      debugPrint('AUTH INIT API ERROR: ${error.message}');
+      debugPrint('AUTH INIT STATUS: ${error.statusCode}');
+
+      if (error.statusCode == 401) {
+        await _authApiService.clearLocalSession();
+      }
+
+      _model = const AuthModel();
+    } catch (error, stackTrace) {
+      debugPrint('AUTH INIT ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
+    notifyListeners();
   }
 
   Future<bool> signIn(String identifier, String password) async {
@@ -73,54 +93,62 @@ class AuthController extends ChangeNotifier {
 
       final user = result['user'] as Map<String, dynamic>;
 
-      _accessToken = result['accessToken'] as String;
-      _refreshToken = result['refreshToken'] as String;
-
       _model = _model.copyWith(
         isLoading: false,
         isAuthenticated: true,
-        userEmail: user['email'] as String,
+        userEmail: user['email'] as String?,
         userRole: 'Creator',
         successMessage: 'Welcome to aurenConnect workspace!',
       );
 
       notifyListeners();
       return true;
-    } on AuthApiException catch (error) {
+    } on ApiException catch (error) {
       _model = _model.copyWith(isLoading: false, errorMessage: error.message);
-
-      notifyListeners();
-      return false;
     } catch (_) {
       _model = _model.copyWith(
         isLoading: false,
         errorMessage: 'Something went wrong. Please try again.',
       );
-
-      notifyListeners();
-      return false;
     }
+
+    notifyListeners();
+    return false;
   }
 
-  void signOut() {
-    _accessToken = null;
-    _refreshToken = null;
+  Future<void> signOut() async {
+    _model = _model.copyWith(isLoading: true, clearError: true);
+    notifyListeners();
+
+    try {
+      await _authApiService.logout();
+    } catch (_) {
+      // Local credentials are cleared even if the server is unavailable.
+    }
 
     _model = const AuthModel();
     notifyListeners();
   }
 
+  // Temporary UI-only OTP flow.
+  // Connect to real backend endpoints when they are implemented.
+
   Future<bool> requestOtp(String identifier) async {
-    _model = _model.copyWith(isLoading: true, clearError: true);
+    _model = _model.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearSuccess: true,
+    );
     notifyListeners();
 
     await Future.delayed(const Duration(milliseconds: 700));
 
     final normalized = identifier.trim().toLowerCase();
-    if (normalized != AuthModel.defaultEmail.toLowerCase()) {
+
+    if (normalized.isEmpty || !normalized.contains('@')) {
       _model = _model.copyWith(
         isLoading: false,
-        errorMessage: 'Email not found. Please use ${AuthModel.defaultEmail}.',
+        errorMessage: 'Please enter a valid email address.',
       );
       notifyListeners();
       return false;
@@ -129,8 +157,9 @@ class AuthController extends ChangeNotifier {
     _model = _model.copyWith(
       isLoading: false,
       step: AuthStep.otp,
-      successMessage: 'OTP verification code sent.',
+      successMessage: 'Demo mode: OTP flow is not connected yet.',
     );
+
     _startTimer();
     notifyListeners();
     return true;
@@ -142,7 +171,7 @@ class AuthController extends ChangeNotifier {
 
     await Future.delayed(const Duration(milliseconds: 700));
 
-    if (otp.length < 4) {
+    if (otp.length != 4) {
       _model = _model.copyWith(
         isLoading: false,
         errorMessage: 'Please enter a valid 4-digit code.',
@@ -156,6 +185,7 @@ class AuthController extends ChangeNotifier {
       step: AuthStep.newPassword,
       successMessage: 'Code verified successfully.',
     );
+
     notifyListeners();
     return true;
   }
@@ -189,14 +219,38 @@ class AuthController extends ChangeNotifier {
       step: AuthStep.signIn,
       successMessage: 'Password reset successfully! Please sign in.',
     );
+
     notifyListeners();
     return true;
   }
 
+  Timer? _timer;
+
+  void _startTimer() {
+    _timer?.cancel();
+
+    _model = _model.copyWith(secondsLeft: 60);
+    notifyListeners();
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_model.secondsLeft > 1) {
+        _model = _model.copyWith(secondsLeft: _model.secondsLeft - 1);
+      } else {
+        _model = _model.copyWith(secondsLeft: 0);
+        timer.cancel();
+      }
+
+      notifyListeners();
+    });
+  }
+
   void resendOtp() {
     if (!canResend) return;
+
     _startTimer();
+
     _model = _model.copyWith(successMessage: 'New OTP sent.');
+
     notifyListeners();
   }
 

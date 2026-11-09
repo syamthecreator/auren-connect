@@ -1,50 +1,101 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import 'package:auren_connect/core/network/api_client.dart';
+import 'package:auren_connect/core/network/api_constants.dart';
+import 'package:auren_connect/core/network/auth_token_manager.dart';
 
 class AuthApiService {
-  // Flutter Web running on the same computer as the backend.
-  static const String baseUrl = 'http://localhost:5001/api/v1';
+  AuthApiService({required this._apiClient, required this._tokenManager});
 
+  final ApiClient _apiClient;
+  final AuthTokenManager _tokenManager;
+
+  /// Login using backend credentials.
+  /// Saves access and refresh tokens after successful authentication.
   Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({'email': email.trim(), 'password': password}),
-      );
+    final response = await _apiClient.post(
+      ApiConstants.login,
+      body: {'email': email.trim().toLowerCase(), 'password': password},
+    );
 
-      final Map<String, dynamic> responseData =
-          jsonDecode(response.body) as Map<String, dynamic>;
-
-      if (response.statusCode == 200 && responseData['success'] == true) {
-        return responseData['data'] as Map<String, dynamic>;
-      }
-
-      throw AuthApiException(
-        responseData['message']?.toString() ?? 'Login failed',
-      );
-    } on AuthApiException {
-      rethrow;
-    } catch (_) {
-      throw AuthApiException(
-        'Unable to connect to the server. Please try again.',
+    if (response['success'] != true) {
+      throw ApiException(
+        message: response['message']?.toString() ?? 'Login failed',
       );
     }
+
+    final data = Map<String, dynamic>.from(response['data'] as Map);
+
+    final accessToken = data['accessToken'] as String?;
+    final refreshToken = data['refreshToken'] as String?;
+
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      throw ApiException(
+        message: 'Authentication tokens were not received from the server.',
+      );
+    }
+
+    await _tokenManager.saveTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
+
+    return data;
   }
-}
 
-class AuthApiException implements Exception {
-  final String message;
+  /// Check whether an access token is stored locally.
+  Future<bool> hasAccessToken() {
+    return _tokenManager.hasAccessToken();
+  }
 
-  AuthApiException(this.message);
+  /// Retrieve the authenticated user's profile.
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await _apiClient.get(ApiConstants.me, requiresAuth: true);
 
-  @override
-  String toString() => message;
+    if (response['success'] != true) {
+      throw ApiException(
+        message:
+            response['message']?.toString() ??
+            'Unable to retrieve user profile',
+      );
+    }
+
+    final data = response['data'];
+
+    if (data is! Map || data['user'] is! Map) {
+      throw ApiException(message: 'Invalid user profile response from server.');
+    }
+
+    return Map<String, dynamic>.from(data);
+  }
+
+  /// Retrieve the saved refresh token.
+  Future<String?> getRefreshToken() {
+    return _tokenManager.getRefreshToken();
+  }
+
+  /// Clear locally stored authentication tokens.
+  Future<void> clearLocalSession() {
+    return _tokenManager.clearTokens();
+  }
+
+  /// Logout from the backend and clear the local session.
+  Future<void> logout() async {
+    final refreshToken = await _tokenManager.getRefreshToken();
+
+    try {
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await _apiClient.post(
+          ApiConstants.logout,
+          body: {'refreshToken': refreshToken},
+        );
+      }
+    } finally {
+      await clearLocalSession();
+    }
+  }
 }

@@ -22,8 +22,10 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   // Pre-filled with requested default credentials for immediate one-tap login
-  final _usernameCtrl = TextEditingController(text: AuthModel.defaultEmail);
-  final _passwordCtrl = TextEditingController(text: AuthModel.defaultPassword);
+  final _usernameCtrl = TextEditingController(
+    text: "aurenthecreator@gmail.com",
+  );
+  final _passwordCtrl = TextEditingController(text: "auren123");
 
   final _otpCtrl = TextEditingController();
   final _newPasswordCtrl = TextEditingController();
@@ -332,7 +334,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          auth.userEmail ?? AuthModel.defaultEmail,
+          auth.userEmail ?? '',
           style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 12),
