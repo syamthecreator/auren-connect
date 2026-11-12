@@ -41,6 +41,14 @@ A clean, modern, and developer-friendly reference for all **Authentication**, **
 | **Automation** | `DELETE` | [`/automations/:id`](#36-delete-automation) | **Bearer** | Permanently delete an automation |
 | **Automation** | `GET` | [`/automations/:id/logs`](#37-get-automation-execution-logs) | **Bearer** | Paginated execution audit trail and error logs |
 | **Automation** | `GET` | [`/automations/analytics/overview`](#38-get-automation-analytics-overview) | **Bearer** | Aggregated performance metrics (total runs, success rate) |
+| **Inbox** | `GET` | [`/inbox/stats`](#41-get-inbox-stats) | **Bearer** | Live inbox stats (unread count, today's messages) |
+| **Inbox** | `GET` | [`/inbox/conversations`](#42-list-conversations) | **Bearer** | List conversations (filter by status, search, tag) |
+| **Inbox** | `GET` | [`/inbox/conversations/:contactId`](#43-get-conversation-by-id) | **Bearer** | Retrieve conversation contact profile and tags |
+| **Inbox** | `PATCH` | [`/inbox/conversations/:contactId`](#44-update-conversation) | **Bearer** | Update conversation status (archive, pin, CRM tags, notes) |
+| **Inbox** | `GET` | [`/inbox/conversations/:contactId/messages`](#45-get-conversation-messages) | **Bearer** | Paginated message history (text, audio, image, video) |
+| **Inbox** | `POST` | [`/inbox/conversations/:contactId/messages`](#46-send-direct-message) | **Bearer** | Send real Instagram DM (text, audio note, image, video, buttons) |
+| **Inbox** | `POST` | [`/inbox/conversations/:contactId/action`](#47-send-sender-action) | **Bearer** | Send `mark_seen`, `typing_on`, `typing_off` indicators |
+| **Inbox** | `POST` | [`/inbox/upload`](#48-upload-media-attachment) | **Bearer** | Upload voice note, image, or video for messaging |
 
 ---
 
@@ -675,9 +683,331 @@ Get aggregated analytics across all automations owned by the user.
 
 ---
 
-## 🧪 4. Complete cURL Cheat Sheet
+## 💬 4. Live Instagram Messaging Inbox Endpoints
 
-Quick commands for testing directly in your terminal. Replace `<ACCESS_TOKEN>`, `<CHANNEL_ID>`, and `<AUTOMATION_ID>` with your real values.
+Base path: `/api/v1/inbox`  
+*(All endpoints require `Authorization: Bearer <ACCESS_TOKEN>`)*
+
+### 💡 Core Inbox Capabilities & Architecture
+The aurenConnect Inbox provides a full real-time Instagram Direct Messaging client powered directly by Meta Graph API v21.0:
+* **All Message Types**: Text, Emojis, Audio voice notes (`.m4a`, `.aac`, `.wav`), Images (`.jpg`, `.png`), Videos (`.mp4`), Story mentions, Story replies, and interactive Quick Reply pills.
+* **Bi-directional Live Sync**: Receives incoming DMs and comments via Meta Webhooks, and syncs outbound echoes (messages sent from the Instagram mobile app or Meta Business Suite).
+* **Meta Sender Actions**: Send `mark_seen` (read receipts), `typing_on`, and `typing_off` indicators.
+* **CRM Metadata**: Star/pin important conversations, archive inactive threads, assign custom CRM tags (e.g. `VIP`, `Lead`, `Follow-up`), and record internal team notes.
+* **Media Upload**: Built-in `/inbox/upload` endpoint allowing clients to record voice memos or select gallery photos/videos and send them instantly.
+
+---
+
+### 4.1 Get Inbox Stats
+Retrieve statistical overview of conversations, unread messages, and today's activity.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/inbox/stats`
+- **Query Parameters:**
+  * `channelId` *(optional)*: Filter stats for a specific Instagram channel.
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "totalConversations": 18,
+    "unreadConversations": 3,
+    "totalMessagesToday": 42,
+    "totalUnreadMessages": 7
+  }
+}
+```
+
+---
+
+### 4.2 List Conversations
+Retrieve conversations (Instagram contacts) sorted by pinned status and latest interaction.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/inbox/conversations`
+- **Query Parameters:**
+  * `channelId` *(optional)*: Filter by connected channel UUID.
+  * `status` *(optional)*: `all`, `unread`, or `archived` (default: unarchived active).
+  * `search` *(optional)*: Case-insensitive search on username, full name, or last message text.
+  * `tag` *(optional)*: Filter by custom CRM tag.
+  * `limit` *(optional, default 50)*: Pagination page size (max 100).
+  * `offset` *(optional, default 0)*: Pagination offset.
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "conversations": [
+      {
+        "id": "c7f1a234-5678-90ab-cdef-112233445566",
+        "channelId": "4a715fbc-1234-4567-89ab-cdef01234567",
+        "instagramScopedId": "17841400000000000",
+        "username": "alex_creator",
+        "name": "Alex Mercer",
+        "profilePic": "https://scontent.cdninstagram.com/...",
+        "tags": ["VIP", "Interested in Pricing"],
+        "unreadCount": 2,
+        "lastMessageText": "Can you send the product video? 🎥",
+        "lastMessageType": "TEXT",
+        "lastMessageAt": "2026-11-12T19:30:00.000Z",
+        "isArchived": false,
+        "isPinned": true,
+        "notes": "Looking for custom enterprise tier",
+        "channel": {
+          "id": "4a715fbc-1234-4567-89ab-cdef01234567",
+          "username": "aurenessence.in",
+          "instagramUserId": "17841415634351143"
+        },
+        "_count": {
+          "messages": 14
+        }
+      }
+    ],
+    "count": 1,
+    "limit": 50,
+    "offset": 0
+  }
+}
+```
+
+---
+
+### 4.3 Get Conversation by ID
+Fetch full contact profile and conversation details.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/inbox/conversations/:contactId`
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "conversation": {
+      "id": "c7f1a234-5678-90ab-cdef-112233445566",
+      "channelId": "4a715fbc-1234-4567-89ab-cdef01234567",
+      "instagramScopedId": "17841400000000000",
+      "username": "alex_creator",
+      "name": "Alex Mercer",
+      "tags": ["VIP"],
+      "unreadCount": 0,
+      "notes": "Interested in annual subscription",
+      "channel": {
+        "id": "4a715fbc-1234-4567-89ab-cdef01234567",
+        "username": "aurenessence.in"
+      }
+    }
+  }
+}
+```
+
+---
+
+### 4.4 Update Conversation
+Update contact flags, CRM tags, and internal notes.
+
+- **Method:** `PATCH`
+- **Path:** `/api/v1/inbox/conversations/:contactId`
+
+#### Request Body
+```json
+{
+  "isArchived": false,
+  "isPinned": true,
+  "tags": ["VIP", "Closed Deal"],
+  "notes": "Follow up next Monday on WhatsApp"
+}
+```
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "message": "Conversation updated successfully",
+  "data": {
+    "conversation": { ... }
+  }
+}
+```
+
+---
+
+### 4.5 Get Conversation Messages
+Retrieve chronological message history for a conversation.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/inbox/conversations/:contactId/messages?limit=50&before=2026-11-12T19:00:00.000Z`
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [
+      {
+        "id": "msg-001",
+        "channelId": "4a715fbc-1234-4567-89ab-cdef01234567",
+        "contactId": "c7f1a234-5678-90ab-cdef-112233445566",
+        "direction": "INBOUND",
+        "messageType": "TEXT",
+        "text": "Hi! Do you have a demo video?",
+        "mediaUrl": null,
+        "mediaType": null,
+        "status": "READ",
+        "metaMessageId": "aWdfbWVzc2FnZToxMDA...",
+        "replyToMetaMessageId": null,
+        "readAt": "2026-11-12T19:35:00.000Z",
+        "sentAt": "2026-11-12T19:30:10.000Z"
+      },
+      {
+        "id": "msg-002",
+        "channelId": "4a715fbc-1234-4567-89ab-cdef01234567",
+        "contactId": "c7f1a234-5678-90ab-cdef-112233445566",
+        "direction": "OUTBOUND",
+        "messageType": "VIDEO",
+        "text": "[VIDEO]",
+        "mediaUrl": "https://auren-backend-5weg.onrender.com/uploads/demo.mp4",
+        "mediaType": "video",
+        "status": "DELIVERED",
+        "metaMessageId": "aWdfbWVzc2FnZToxMDE...",
+        "replyToMetaMessageId": "aWdfbWVzc2FnZToxMDA...",
+        "sentAt": "2026-11-12T19:32:00.000Z"
+      }
+    ],
+    "count": 2
+  }
+}
+```
+
+---
+
+### 4.6 Send Direct Message
+Send a live Instagram message to the contact's inbox via Meta Graph API v21.0.
+
+- **Method:** `POST`
+- **Path:** `/api/v1/inbox/conversations/:contactId/messages`
+
+#### Request Body (Text with Emojis & Optional Quoted Reply)
+```json
+{
+  "text": "Hey Alex! Here are the details you requested 🔥✨",
+  "replyToMetaMessageId": "aWdfbWVzc2FnZToxMDA..."
+}
+```
+
+#### Request Body (Audio Voice Note / Recording)
+```json
+{
+  "mediaUrl": "https://auren-backend-5weg.onrender.com/uploads/voice_recording_1.m4a",
+  "mediaType": "audio"
+}
+```
+
+#### Request Body (Image Attachment)
+```json
+{
+  "mediaUrl": "https://auren-backend-5weg.onrender.com/uploads/product_photo.jpg",
+  "mediaType": "image"
+}
+```
+
+#### Request Body (With Quick Replies)
+```json
+{
+  "text": "What is the best way to contact you?",
+  "quickReplies": [
+    { "title": "Instagram DM", "payload": "CHANNEL_IG" },
+    { "title": "WhatsApp", "payload": "CHANNEL_WA" }
+  ]
+}
+```
+
+#### Success Response (`201 Created`)
+```json
+{
+  "success": true,
+  "message": "Message sent successfully",
+  "data": {
+    "message": {
+      "id": "msg-003",
+      "channelId": "4a715fbc-1234-4567-89ab-cdef01234567",
+      "contactId": "c7f1a234-5678-90ab-cdef-112233445566",
+      "direction": "OUTBOUND",
+      "messageType": "TEXT",
+      "text": "Hey Alex! Here are the details you requested 🔥✨",
+      "status": "DELIVERED",
+      "metaMessageId": "mid.$cAA...",
+      "sentAt": "2026-11-12T19:35:12.000Z"
+    }
+  }
+}
+```
+
+---
+
+### 4.7 Send Sender Action
+Send live indicators to the Instagram user's Direct app (mark message as seen or show typing bubbles).
+
+- **Method:** `POST`
+- **Path:** `/api/v1/inbox/conversations/:contactId/action`
+
+#### Request Body
+```json
+{
+  "action": "mark_seen"
+}
+```
+*(Allowed values: `mark_seen`, `typing_on`, `typing_off`)*
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "action": "mark_seen"
+  }
+}
+```
+
+---
+
+### 4.8 Upload Media Attachment
+Upload a base64 encoded audio voice note, picture, or video file to the server and receive a publicly accessible URL for sending in chat.
+
+- **Method:** `POST`
+- **Path:** `/api/v1/inbox/upload`
+
+#### Request Body
+```json
+{
+  "fileBase64": "data:audio/m4a;base64,GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUK...",
+  "filename": "voice_memo.m4a",
+  "mimeType": "audio/m4a"
+}
+```
+
+#### Success Response (`201 Created`)
+```json
+{
+  "success": true,
+  "message": "Media uploaded successfully",
+  "data": {
+    "url": "https://auren-backend-5weg.onrender.com/uploads/uuid_voice_memo.m4a",
+    "filename": "uuid_voice_memo.m4a",
+    "mimeType": "audio/m4a",
+    "mediaType": "audio"
+  }
+}
+```
+
+---
+
+## 🧪 5. Complete cURL Cheat Sheet
+
+Quick commands for testing directly in your terminal. Replace `<ACCESS_TOKEN>`, `<CHANNEL_ID>`, `<AUTOMATION_ID>`, and `<CONTACT_ID>` with your real values.
 
 ### 4.1 Auth Commands
 
@@ -785,5 +1115,115 @@ curl "https://auren-backend-5weg.onrender.com/api/v1/automations/<AUTOMATION_ID>
 # Delete Automation
 curl -X DELETE https://auren-backend-5weg.onrender.com/api/v1/automations/<AUTOMATION_ID> \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+---
+
+### 5.4 Live Inbox Commands
+
+```bash
+# Get Inbox Stats
+curl https://auren-backend-5weg.onrender.com/api/v1/inbox/stats \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# List Conversations (Active)
+curl "https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations?limit=20" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Filter Unread Conversations
+curl "https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations?status=unread" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Search Conversations by Username or Name
+curl "https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations?search=alex" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Get Single Conversation Details
+curl https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID> \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Get Chronological Messages for Conversation
+curl "https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/messages?limit=50" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+
+# Send Text Message with Emojis
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/messages \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Hello! How can we help your business grow today? 🚀✨"
+  }'
+
+# Send Quoted / Reply-To Message
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/messages \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Yes, our prices start at $29/mo!",
+    "replyToMetaMessageId": "<META_MESSAGE_ID>"
+  }'
+
+# Send Audio Voice Note
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/messages \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mediaUrl": "https://auren-backend-5weg.onrender.com/uploads/voice_sample.m4a",
+    "mediaType": "audio"
+  }'
+
+# Send Image / Photo
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/messages \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mediaUrl": "https://auren-backend-5weg.onrender.com/uploads/product_catalog.jpg",
+    "mediaType": "image"
+  }'
+
+# Send Video Clip
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/messages \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mediaUrl": "https://auren-backend-5weg.onrender.com/uploads/product_demo.mp4",
+    "mediaType": "video"
+  }'
+
+# Send Mark As Seen (Read Receipt)
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/action \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "mark_seen"
+  }'
+
+# Send Typing Indicator On
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID>/action \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "typing_on"
+  }'
+
+# Update Conversation (Pin, CRM Tags, Notes)
+curl -X PATCH https://auren-backend-5weg.onrender.com/api/v1/inbox/conversations/<CONTACT_ID> \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "isPinned": true,
+    "tags": ["VIP", "High Intent"],
+    "notes": "Interested in annual plan"
+  }'
+
+# Upload Base64 Audio / Image / Video File
+curl -X POST https://auren-backend-5weg.onrender.com/api/v1/inbox/upload \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "filename": "sample.png",
+    "mimeType": "image/png"
+  }'
 ```
 

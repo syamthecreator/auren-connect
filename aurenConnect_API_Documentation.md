@@ -114,6 +114,14 @@ Authorization: Bearer <ACCESS_TOKEN>
 | **DELETE** | `/automations/:id` | **Bearer Token** | Permanently delete an automation |
 | **GET** | `/automations/:id/logs` | **Bearer Token** | Get execution history and error logs for an automation |
 | **GET** | `/automations/analytics/overview` | **Bearer Token** | Get aggregated analytics overview (total runs, success rate, triggers) |
+| **GET** | `/inbox/stats` | **Bearer Token** | Retrieve real-time inbox statistics (unread counts, today's messages) |
+| **GET** | `/inbox/conversations` | **Bearer Token** | List conversations (Instagram contacts) with search, status, and tag filters |
+| **GET** | `/inbox/conversations/:contactId` | **Bearer Token** | Get conversation profile details, tags, and CRM notes |
+| **PATCH** | `/inbox/conversations/:contactId` | **Bearer Token** | Update conversation flags (archive, pin, CRM tags, notes) |
+| **GET** | `/inbox/conversations/:contactId/messages` | **Bearer Token** | Paginated message history (text, voice, image, video) |
+| **POST** | `/inbox/conversations/:contactId/messages` | **Bearer Token** | Send live Instagram DM (text, emoji, voice note, image, video, buttons) |
+| **POST** | `/inbox/conversations/:contactId/action` | **Bearer Token** | Send Meta sender action (`mark_seen`, `typing_on`, `typing_off`) |
+| **POST** | `/inbox/upload` | **Bearer Token** | Upload base64 voice note recording, photo, or video |
 
 ---
 
@@ -961,6 +969,13 @@ model InstagramContact {
   name               String?
   profilePic         String?
   tags               String[]         @default([])
+  unreadCount        Int              @default(0)
+  lastMessageText    String?          @db.Text
+  lastMessageType    String?
+  lastMessageAt      DateTime         @default(now())
+  isArchived         Boolean          @default(false)
+  isPinned           Boolean          @default(false)
+  notes              String?          @db.Text
   lastInteractionAt  DateTime         @default(now())
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
@@ -970,24 +985,32 @@ model InstagramContact {
 
   @@unique([channelId, instagramScopedId])
   @@index([channelId])
+  @@index([channelId, lastMessageAt])
   @@map("instagram_contacts")
 }
 
 model InstagramMessage {
-  id            String           @id @default(uuid())
-  channelId     String
-  contactId     String
-  direction     String           // INBOUND, OUTBOUND
-  messageType   String           // TEXT, COMMENT, STORY_REPLY, STORY_MENTION, QUICK_REPLY
-  text          String?          @db.Text
-  metaMessageId String?
-  sentAt        DateTime         @default(now())
+  id                    String           @id @default(uuid())
+  channelId             String
+  contactId             String
+  direction             String           // INBOUND, OUTBOUND
+  messageType           String           // TEXT, IMAGE, VIDEO, AUDIO, VOICE, FILE, SHARE, STORY_REPLY, STORY_MENTION, QUICK_REPLY, COMMENT
+  text                  String?          @db.Text
+  mediaUrl              String?          @db.Text
+  mediaType             String?          // image, video, audio, voice, file, share
+  status                String           @default("DELIVERED") // PENDING, SENT, DELIVERED, READ, FAILED
+  metaMessageId         String?
+  replyToMetaMessageId  String?
+  rawPayload            Json?
+  readAt                DateTime?
+  sentAt                DateTime         @default(now())
 
-  channel       InstagramChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
-  contact       InstagramContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  channel               InstagramChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contact               InstagramContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@index([channelId])
   @@index([contactId])
+  @@index([contactId, sentAt])
   @@map("instagram_messages")
 }
 ```
