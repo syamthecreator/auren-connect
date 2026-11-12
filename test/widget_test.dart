@@ -1,5 +1,4 @@
 import 'package:auren_connect/app/app.dart';
-import 'package:auren_connect/features/overview/presentation/screens/overview_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:auren_connect/features/auth/presentation/screens/login_screen.dart';
@@ -31,7 +30,6 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify transition to DashboardScreen
-      expect(find.byType(OverviewScreen), findsOneWidget);
       expect(find.text('AUTOMATION STUDIO'), findsOneWidget);
       expect(find.text('Messages sent'), findsOneWidget);
       expect(find.text('Active flows'), findsOneWidget);

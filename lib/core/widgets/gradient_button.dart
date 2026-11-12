@@ -2,29 +2,24 @@ import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/app/theme/app_text_styles.dart';
 import 'package:flutter/material.dart';
 
-class GradientButton extends StatefulWidget {
+class GradientButton extends StatelessWidget {
   const GradientButton({super.key, required this.label, this.icon, this.onTap});
+
   final String label;
   final IconData? icon;
   final VoidCallback? onTap;
 
   @override
-  State<GradientButton> createState() => _GradientButtonState();
-}
-
-class _GradientButtonState extends State<GradientButton> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        hoverColor: Colors.white.withValues(alpha: .06),
+        splashColor: Colors.white.withValues(alpha: .12),
+        child: Ink(
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
@@ -32,20 +27,20 @@ class _GradientButtonState extends State<GradientButton> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: _hover ? .55 : .3),
-                blurRadius: _hover ? 26 : 16,
+                color: AppColors.primary.withValues(alpha: .3),
+                blurRadius: 16,
               ),
             ],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, size: 18, color: Colors.white),
+              if (icon != null) ...[
+                Icon(icon, size: 18, color: Colors.white),
                 const SizedBox(width: 8),
               ],
               Text(
-                widget.label,
+                label,
                 style: AppTextStyles.t(14, w: FontWeight.w600, c: Colors.white),
               ),
             ],

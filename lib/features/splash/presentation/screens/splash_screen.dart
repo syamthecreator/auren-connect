@@ -1,6 +1,6 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
+
+import 'package:auren_connect/features/splash/controller/splash_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,9 +8,7 @@ import '../../../../app/routes/app_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_text_styles.dart';
 import '../../../../core/constants/asset_constants.dart';
-import '../../../../core/network/auth_token_manager.dart';
 import '../../../../core/utils/shell_scope.dart';
-import '../../../auth/controllers/auth_controller.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,13 +27,15 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _logoScale;
   late final Animation<double> _pulseScale;
 
-  String _statusText = 'Initializing workspace...';
+  late final SplashController _splashController;
 
   @override
   void initState() {
     super.initState();
 
-    // 1. Entry Animation (Logo fade and gentle scale)
+    _splashController = context.read<SplashController>();
+
+    // Entry animation.
     _entryController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -47,107 +47,72 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _logoScale = Tween<double>(begin: 0.88, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _entryController,
-        curve: Curves.easeOutBack,
-      ),
+      CurvedAnimation(parent: _entryController, curve: Curves.easeOutBack),
     );
 
-    // 2. Continuous Breathing Ambient Glow
+    // Continuous ambient pulse.
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
 
     _pulseScale = Tween<double>(begin: 0.92, end: 1.08).animate(
-      CurvedAnimation(
-        parent: _pulseController,
-        curve: Curves.easeInOutSine,
-      ),
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutSine),
     );
 
-    // 3. Progress Bar Animation (1.8 seconds)
+    // Progress animation.
     _progressController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
 
+    // Status updates are managed by SplashController.
     _progressController.addListener(() {
-      final val = _progressController.value;
-      if (val > 0.8 && _statusText != 'Workspace ready') {
-        setState(() => _statusText = 'Workspace ready');
-      } else if (val > 0.4 &&
-          val <= 0.8 &&
-          _statusText != 'Connecting Meta Cloud API...') {
-        setState(() => _statusText = 'Connecting Meta Cloud API...');
-      }
+      _splashController.updateProgress(_progressController.value);
     });
 
     _startFlow();
   }
 
+  /// Starts splash and authentication flow.
   Future<void> _startFlow() async {
-    final uri = Uri.base;
-    final href = html.window.location.href;
-    final isOAuthReturn = uri.queryParameters['tab'] == 'channel' ||
-        uri.queryParameters.containsKey('connected') ||
-        uri.fragment.contains('channel') ||
-        href.contains('tab=channel') ||
-        href.contains('connected=true');
+    // Handle OAuth popup.
+    if (_splashController.handleOAuthPopup()) return;
 
-    if (isOAuthReturn) {
-      // If this is a popup window that was redirected, notify opener and close
-      try {
-        if (html.window.opener != null && !html.window.opener!.closed!) {
-          html.window.opener!.postMessage('AUREN_INSTAGRAM_CONNECTED', '*');
-          html.window.close();
-          return;
-        }
-      } catch (_) {}
+    final isOAuthReturn = _splashController.isOAuthReturn;
 
-      // If cannot close or is primary tab, proceed straight to dashboard on Channel tab
-      final tokenManager = context.read<AuthTokenManager>();
-      final hasToken = await tokenManager.hasAccessToken();
-      if (!mounted) return;
+    // Start animations.
+    _entryController.forward();
+    _progressController.forward();
 
-      if (hasToken) {
-        final auth = context.read<AuthController>();
-        if (!auth.isAuthenticated) {
-          await auth.initialize();
-        }
-        if (!mounted) return;
+    // Validate authentication.
+    final destination = await _splashController.startFlow(
+      isOAuthReturn: isOAuthReturn,
+    );
+
+    if (!mounted) return;
+
+    switch (destination) {
+      case SplashDestination.popupClosed:
+        return;
+
+      case SplashDestination.channel:
         Navigator.of(context).pushReplacementNamed(
           AppRouter.dashboard,
           arguments: NavDestination.channel,
         );
-        return;
-      }
-    }
+        break;
 
-    _entryController.forward();
-    _progressController.forward();
+      case SplashDestination.dashboard:
+        Navigator.of(context).pushReplacementNamed(
+          AppRouter.dashboard,
+          arguments: isOAuthReturn ? NavDestination.channel : null,
+        );
+        break;
 
-    // Run auth validation in parallel with splash animation
-    final tokenManager = context.read<AuthTokenManager>();
-    final hasToken = await tokenManager.hasAccessToken();
-
-    // Let animation finish gracefully for professional feel
-    await Future.delayed(const Duration(milliseconds: 2000));
-
-    if (!mounted) return;
-
-    if (hasToken) {
-      final auth = context.read<AuthController>();
-      if (!auth.isAuthenticated) {
-        await auth.initialize();
-      }
-      if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(
-        AppRouter.dashboard,
-        arguments: isOAuthReturn ? NavDestination.channel : null,
-      );
-    } else {
-      Navigator.of(context).pushReplacementNamed(AppRouter.auth);
+      case SplashDestination.auth:
+        Navigator.of(context).pushReplacementNamed(AppRouter.auth);
+        break;
     }
   }
 
@@ -156,6 +121,7 @@ class _SplashScreenState extends State<SplashScreen>
     _entryController.dispose();
     _pulseController.dispose();
     _progressController.dispose();
+
     super.dispose();
   }
 
@@ -224,7 +190,9 @@ class _SplashScreenState extends State<SplashScreen>
                       borderRadius: BorderRadius.circular(50),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.paletteNeonCyan.withValues(alpha: 0.22),
+                          color: AppColors.paletteNeonCyan.withValues(
+                            alpha: 0.22,
+                          ),
                           blurRadius: 70,
                           spreadRadius: 20,
                         ),
@@ -265,15 +233,21 @@ class _SplashScreenState extends State<SplashScreen>
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.paletteNeonCyan.withValues(alpha: 0.12),
+                            color: AppColors.paletteNeonCyan.withValues(
+                              alpha: 0.12,
+                            ),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.paletteNeonCyan.withValues(alpha: 0.4),
+                              color: AppColors.paletteNeonCyan.withValues(
+                                alpha: 0.4,
+                              ),
                               width: 1,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.paletteNeonCyan.withValues(alpha: 0.15),
+                                color: AppColors.paletteNeonCyan.withValues(
+                                  alpha: 0.15,
+                                ),
                                 blurRadius: 12,
                               ),
                             ],
@@ -315,14 +289,18 @@ class _SplashScreenState extends State<SplashScreen>
                             return Align(
                               alignment: Alignment.centerLeft,
                               child: FractionallySizedBox(
-                                widthFactor: _progressController.value.clamp(0.02, 1.0),
+                                widthFactor: _progressController.value.clamp(
+                                  0.02,
+                                  1.0,
+                                ),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     gradient: AppColors.neonLaserGradient,
                                     borderRadius: BorderRadius.circular(8),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppColors.paletteNeonCyan.withValues(alpha: 0.6),
+                                        color: AppColors.paletteNeonCyan
+                                            .withValues(alpha: 0.6),
                                         blurRadius: 8,
                                         spreadRadius: 1,
                                       ),
@@ -337,18 +315,22 @@ class _SplashScreenState extends State<SplashScreen>
 
                       const SizedBox(height: 14),
 
-                      // Status Text
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        child: Text(
-                          _statusText,
-                          key: ValueKey(_statusText),
-                          style: AppTextStyles.t(
-                            12.5,
-                            c: AppColors.textSecondary,
-                            w: FontWeight.w500,
-                          ),
-                        ),
+                      Selector<SplashController, String>(
+                        selector: (_, controller) => controller.statusText,
+                        builder: (context, statusText, child) {
+                          return AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            child: Text(
+                              statusText,
+                              key: ValueKey(statusText),
+                              style: AppTextStyles.t(
+                                12.5,
+                                c: AppColors.textSecondary,
+                                w: FontWeight.w500,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -402,4 +384,3 @@ class _SplashGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-

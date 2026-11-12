@@ -173,12 +173,12 @@ class AuthTextField extends StatefulWidget {
 }
 
 class _AuthTextFieldState extends State<AuthTextField> {
-  final FocusNode _focus = FocusNode();
+  late final FocusNode _focus;
 
   @override
   void initState() {
     super.initState();
-    _focus.addListener(() => setState(() {}));
+    _focus = FocusNode();
   }
 
   @override
@@ -189,84 +189,90 @@ class _AuthTextFieldState extends State<AuthTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final focused = _focus.hasFocus && !widget.readOnly;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: focused ? AppColors.primary.withValues(alpha: 0.22) : null,
-      ),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 52),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: widget.readOnly
-              ? AppColors.surfaceVariant
-              : focused
-              ? AppColors.card
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: focused ? AppColors.borderGlow : AppColors.border,
-            width: focused ? 1.4 : 1.2,
+    return ListenableBuilder(
+      listenable: _focus,
+      builder: (context, child) {
+        final focused = _focus.hasFocus && !widget.readOnly;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: focused ? AppColors.primary.withValues(alpha: 0.22) : null,
           ),
-        ),
-        child: TextField(
-          controller: widget.controller,
-          focusNode: _focus,
-          readOnly: widget.readOnly,
-          obscureText: widget.obscureText,
-          obscuringCharacter: '•',
-          autofocus: widget.autofocus,
-          keyboardType: widget.keyboardType,
-          inputFormatters: widget.inputFormatters,
-          maxLength: widget.maxLength,
-          textInputAction: widget.textInputAction,
-          onSubmitted: widget.onSubmitted,
-          autofillHints: widget.autofillHints,
-          cursorColor: AppColors.primary,
-          textAlignVertical: TextAlignVertical.center,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-            letterSpacing: widget.letterSpacing,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 52),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: widget.readOnly
+                  ? AppColors.surfaceVariant
+                  : focused
+                  ? AppColors.card
+                  : AppColors.surface,
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(
+                color: focused ? AppColors.borderGlow : AppColors.border,
+                width: focused ? 1.4 : 1.2,
+              ),
+            ),
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focus,
+              readOnly: widget.readOnly,
+              obscureText: widget.obscureText,
+              obscuringCharacter: '•',
+              autofocus: widget.autofocus,
+              keyboardType: widget.keyboardType,
+              inputFormatters: widget.inputFormatters,
+              maxLength: widget.maxLength,
+              textInputAction: widget.textInputAction,
+              onSubmitted: widget.onSubmitted,
+              autofillHints: widget.autofillHints,
+              cursorColor: AppColors.primary,
+              textAlignVertical: TextAlignVertical.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: widget.letterSpacing,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                counterText: '',
+                border: InputBorder.none,
+                hintText: widget.hint,
+                hintStyle: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textMuted,
+                  letterSpacing: 0,
+                ),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 46,
+                  minHeight: 46,
+                ),
+                prefixIcon: Icon(
+                  widget.prefixIcon,
+                  size: 20,
+                  color:
+                      widget.iconColor ??
+                      (focused ? AppColors.primary : AppColors.textSecondary),
+                ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 46,
+                  minHeight: 46,
+                ),
+                suffixIcon: widget.suffix,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+              ),
+            ),
           ),
-          decoration: InputDecoration(
-            isDense: true,
-            counterText: '',
-            border: InputBorder.none,
-            hintText: widget.hint,
-            hintStyle: const TextStyle(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textMuted,
-              letterSpacing: 0,
-            ),
-            prefixIconConstraints: const BoxConstraints(
-              minWidth: 46,
-              minHeight: 46,
-            ),
-            prefixIcon: Icon(
-              widget.prefixIcon,
-              size: 20,
-              color:
-                  widget.iconColor ??
-                  (focused ? AppColors.primary : AppColors.textSecondary),
-            ),
-            suffixIconConstraints: const BoxConstraints(
-              minWidth: 46,
-              minHeight: 46,
-            ),
-            suffixIcon: widget.suffix,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

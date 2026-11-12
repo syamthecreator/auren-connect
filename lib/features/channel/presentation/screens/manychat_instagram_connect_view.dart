@@ -27,12 +27,10 @@ class ManyChatInstagramConnectView extends StatefulWidget {
 
 class _ManyChatInstagramConnectViewState
     extends State<ManyChatInstagramConnectView> {
-  bool _isLoading = false;
-  bool _isAwaitingMeta = false;
-  bool _showMoreOptions = false;
   Timer? _pollingTimer;
   StreamSubscription<html.MessageEvent>? _messageSub;
   dynamic _authPopup;
+  bool _connectionHandled = false;
 
   @override
   void initState() {
@@ -46,6 +44,18 @@ class _ManyChatInstagramConnectViewState
     _messageSub?.cancel();
     _authPopup?.close();
     super.dispose();
+  }
+
+  void _handleBack() {
+    _pollingTimer?.cancel();
+
+    try {
+      _authPopup?.close();
+    } catch (_) {}
+
+    context.read<ChannelController>().setAwaitingMeta(false);
+
+    widget.onBack();
   }
 
   void _listenForMetaCallback() {
@@ -73,29 +83,32 @@ class _ManyChatInstagramConnectViewState
   }
 
   Future<void> _handleConnectionSuccess() async {
+    if (_connectionHandled) return;
+    _connectionHandled = true;
+
     _pollingTimer?.cancel();
+
     try {
       _authPopup?.close();
     } catch (_) {}
 
-    // Immediately trigger onConnected to transition parent back to ChannelScreen!
-    widget.onConnected();
-
-    if (!mounted) return;
-    setState(() {
-      _isLoading = false;
-      _isAwaitingMeta = false;
-    });
-
     final controller = context.read<ChannelController>();
+
+    controller.setAwaitingMeta(false);
+
     await controller.loadChannels();
 
     if (!mounted) return;
+
     AppSnackBar.success(context, 'Instagram account connected successfully!');
+
+    widget.onConnected();
   }
 
   Future<void> _connectViaMeta() async {
-    // Open blank popup immediately on user gesture to avoid browser popup blockers
+    _connectionHandled = false;
+
+    // Open popup immediately to avoid browser popup blockers.
     try {
       _authPopup = html.window.open(
         'about:blank',
@@ -104,12 +117,10 @@ class _ManyChatInstagramConnectViewState
       );
     } catch (_) {}
 
-    setState(() {
-      _isLoading = true;
-      _isAwaitingMeta = true;
-    });
-
     final controller = context.read<ChannelController>();
+
+    controller.setAwaitingMeta(true);
+
     final url = await controller.getInstagramAuthorizationUrl();
 
     if (!mounted) {
@@ -117,34 +128,36 @@ class _ManyChatInstagramConnectViewState
       return;
     }
 
-    setState(() => _isLoading = false);
-
     if (url == null || url.isEmpty) {
       _authPopup?.close();
-      setState(() => _isAwaitingMeta = false);
+
+      controller.setAwaitingMeta(false);
+
       AppSnackBar.error(
         context,
         controller.errorMessage ?? 'Failed to initialize Meta connection.',
       );
+
       return;
     }
 
-    // Direct popup to Meta Unified Login
+    // Redirect popup to Meta authorization.
     try {
       _authPopup?.location.href = url;
     } catch (_) {
       html.window.open(url, '_blank');
     }
 
-    // Start polling in background to detect when user clicks "Save" on Meta
     _startPolling();
   }
 
   void _startPolling() {
     _pollingTimer?.cancel();
     int count = 0;
-    final initialCount =
-        context.read<ChannelController>().instagramAccounts.length;
+    final initialCount = context
+        .read<ChannelController>()
+        .instagramAccounts
+        .length;
 
     _pollingTimer = Timer.periodic(const Duration(seconds: 2), (timer) async {
       count++;
@@ -166,7 +179,7 @@ class _ManyChatInstagramConnectViewState
       } else if (count >= 120) {
         // Stop polling after 4 minutes
         timer.cancel();
-        setState(() => _isAwaitingMeta = false);
+        context.read<ChannelController>().setAwaitingMeta(false);
       }
     });
   }
@@ -174,7 +187,6 @@ class _ManyChatInstagramConnectViewState
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width >= 900;
-
     return Container(
       color: const Color(0xFF070C15),
       child: SafeArea(
@@ -220,7 +232,7 @@ class _ManyChatInstagramConnectViewState
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: InkWell(
-                  onTap: widget.onBack,
+                  onTap: _handleBack,
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -371,6 +383,8 @@ class _ManyChatInstagramConnectViewState
   }
 
   Widget _buildRightCard() {
+    final controller = context.watch<ChannelController>();
+
     return Container(
       constraints: const BoxConstraints(maxWidth: 440),
       padding: const EdgeInsets.all(32),
@@ -406,7 +420,7 @@ class _ManyChatInstagramConnectViewState
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _connectViaMeta,
+              onPressed: controller.isConnecting ? null : _connectViaMeta,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0866FF), // Meta Blue
                 foregroundColor: Colors.white,
@@ -415,7 +429,7 @@ class _ManyChatInstagramConnectViewState
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: _isLoading
+              child: controller.isConnecting
                   ? const SizedBox(
                       width: 20,
                       height: 20,
@@ -430,7 +444,7 @@ class _ManyChatInstagramConnectViewState
                         const Icon(RemixIcons.facebook_circle_fill, size: 20),
                         const SizedBox(width: 10),
                         Text(
-                          _isAwaitingMeta
+                          controller.isAwaitingMeta
                               ? 'Connecting on Meta...'
                               : 'Connect Via Meta',
                           style: AppTextStyles.t(15, w: FontWeight.w700),
@@ -440,7 +454,7 @@ class _ManyChatInstagramConnectViewState
             ),
           ),
 
-          if (_isAwaitingMeta) ...[
+          if (controller.isAwaitingMeta) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -529,7 +543,7 @@ class _ManyChatInstagramConnectViewState
 
           // See More Options Expandable
           InkWell(
-            onTap: () => setState(() => _showMoreOptions = !_showMoreOptions),
+            onTap: controller.toggleMoreOptions,
             borderRadius: BorderRadius.circular(6),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -546,7 +560,7 @@ class _ManyChatInstagramConnectViewState
                   ),
                   const SizedBox(width: 4),
                   Icon(
-                    _showMoreOptions
+                    controller.showMoreOptions
                         ? RemixIcons.arrow_up_s_line
                         : RemixIcons.arrow_down_s_line,
                     size: 16,
@@ -557,7 +571,7 @@ class _ManyChatInstagramConnectViewState
             ),
           ),
 
-          if (_showMoreOptions) ...[
+          if (controller.showMoreOptions) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),

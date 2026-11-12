@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:remixicon/remixicon.dart';
 
-enum NavDestination { overview, automations, channel, inbox, settings }
+enum NavDestination { automations, channel, inbox, settings }
 
 extension NavDestinationX on NavDestination {
   String get label => switch (this) {
-    NavDestination.overview => 'Overview',
     NavDestination.automations => 'Automations',
     NavDestination.channel => 'Channel',
     NavDestination.inbox => 'Inbox',
@@ -13,7 +12,6 @@ extension NavDestinationX on NavDestination {
   };
 
   IconData get icon => switch (this) {
-    NavDestination.overview => RemixIcons.dashboard_line,
     NavDestination.automations => RemixIcons.flow_chart,
     NavDestination.channel => RemixIcons.plug_2_line,
     NavDestination.inbox => RemixIcons.inbox_line,
@@ -21,7 +19,6 @@ extension NavDestinationX on NavDestination {
   };
 
   String get blurb => switch (this) {
-    NavDestination.overview => 'Your studio at a glance.',
     NavDestination.automations => 'Build and manage automated conversations.',
     NavDestination.channel => 'Connect and manage your Instagram account.',
     NavDestination.inbox => 'Every conversation, one shared inbox.',

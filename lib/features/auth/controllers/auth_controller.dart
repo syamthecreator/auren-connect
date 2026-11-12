@@ -259,4 +259,28 @@ class AuthController extends ChangeNotifier {
     _timer?.cancel();
     super.dispose();
   }
+
+  // Password visibility states
+  bool _hidePassword = true;
+  bool _hideNewPassword = true;
+  bool _hideConfirmPassword = true;
+
+  bool get hidePassword => _hidePassword;
+  bool get hideNewPassword => _hideNewPassword;
+  bool get hideConfirmPassword => _hideConfirmPassword;
+
+  void togglePasswordVisibility() {
+    _hidePassword = !_hidePassword;
+    notifyListeners();
+  }
+
+  void toggleNewPasswordVisibility() {
+    _hideNewPassword = !_hideNewPassword;
+    notifyListeners();
+  }
+
+  void toggleConfirmPasswordVisibility() {
+    _hideConfirmPassword = !_hideConfirmPassword;
+    notifyListeners();
+  }
 }

@@ -36,6 +36,7 @@ class AppSidebar extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 180;
+
           return ClipRect(
             child: Column(
               children: [
@@ -52,19 +53,20 @@ class AppSidebar extends StatelessWidget {
                     ),
                     children: [
                       if (!compact) const _GroupLabel('Workspace'),
-                      for (final d in [
-                        NavDestination.overview,
+                      for (final destination in [
                         NavDestination.automations,
                         NavDestination.inbox,
                         NavDestination.channel,
                         NavDestination.settings,
                       ])
                         _NavItem(
-                          destination: d,
-                          active: d == current,
+                          destination: destination,
+                          active: destination == current,
                           compact: compact,
-                          badge: d == NavDestination.inbox ? '12' : null,
-                          onTap: () => onSelect(d),
+                          badge: destination == NavDestination.inbox
+                              ? '12'
+                              : null,
+                          onTap: () => onSelect(destination),
                         ),
                     ],
                   ),
@@ -77,16 +79,12 @@ class AppSidebar extends StatelessWidget {
                     compact ? 12 : 14,
                     14,
                   ),
-                  child: Column(
-                    children: [
-                      _ActionItem(
-                        icon: RemixIcons.logout_box_r_line,
-                        label: 'Log out',
-                        compact: compact,
-                        color: AppColors.error,
-                        onTap: onLogout,
-                      ),
-                    ],
+                  child: _ActionItem(
+                    icon: RemixIcons.logout_box_r_line,
+                    label: 'Log out',
+                    compact: compact,
+                    color: AppColors.error,
+                    onTap: onLogout,
                   ),
                 ),
               ],
@@ -97,6 +95,10 @@ class AppSidebar extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BRAND
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _Brand extends StatelessWidget {
   const _Brand({
@@ -153,7 +155,7 @@ class _Brand extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Icon(
+                      const Icon(
                         RemixIcons.menu_fold_line,
                         size: 19,
                         color: AppColors.textSecondary,
@@ -170,6 +172,7 @@ class _Brand extends StatelessWidget {
     return Container(
       width: 40,
       height: 40,
+      padding: const EdgeInsets.all(7),
       decoration: BoxDecoration(
         gradient: AppColors.neonLaserGradient,
         borderRadius: BorderRadius.circular(12),
@@ -180,78 +183,41 @@ class _Brand extends StatelessWidget {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(7),
       child: Image.asset(AssetConstants.aLogo, fit: BoxFit.contain),
     );
   }
 }
 
-class _SidebarToggle extends StatefulWidget {
-  const _SidebarToggle({required this.collapsed, required this.onTap});
+// ─────────────────────────────────────────────────────────────────────────────
+// GROUP LABEL
+// ─────────────────────────────────────────────────────────────────────────────
 
-  final bool collapsed;
-  final VoidCallback onTap;
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.text);
 
-  @override
-  State<_SidebarToggle> createState() => _SidebarToggleState();
-}
-
-class _SidebarToggleState extends State<_SidebarToggle> {
-  bool _hover = false;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: widget.collapsed ? 'Expand sidebar' : 'Collapse sidebar',
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: _hover
-                  ? AppColors.primary.withValues(alpha: .12)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              widget.collapsed
-                  ? RemixIcons.menu_unfold_line
-                  : RemixIcons.menu_fold_line,
-              size: 19,
-              color: _hover ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.textMuted,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 }
 
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.text);
-  final String text;
+// ─────────────────────────────────────────────────────────────────────────────
+// NAVIGATION ITEM
+// ─────────────────────────────────────────────────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(10, 14, 10, 8),
-    child: Text(
-      text,
-      style: const TextStyle(
-        color: AppColors.textMuted,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  );
-}
-
-class _NavItem extends StatefulWidget {
+class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.destination,
     required this.active,
@@ -267,31 +233,24 @@ class _NavItem extends StatefulWidget {
   final String? badge;
 
   @override
-  State<_NavItem> createState() => _NavItemState();
-}
-
-class _NavItemState extends State<_NavItem> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
-    final active = widget.active;
-    final fg = active
+    final foregroundColor = active
         ? AppColors.primary
-        : (_hover ? AppColors.textPrimary : AppColors.textSecondary);
+        : AppColors.textSecondary;
 
-    Widget item = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
+    Widget item = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        hoverColor: Colors.white.withValues(alpha: .04),
+        splashColor: AppColors.primary.withValues(alpha: .10),
+        highlightColor: AppColors.primary.withValues(alpha: .06),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           margin: const EdgeInsets.symmetric(vertical: 2),
           height: 46,
-          padding: EdgeInsets.symmetric(horizontal: widget.compact ? 0 : 12),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             gradient: active
@@ -302,9 +261,6 @@ class _NavItemState extends State<_NavItem> {
                     ],
                   )
                 : null,
-            color: !active && _hover
-                ? Colors.white.withValues(alpha: .04)
-                : null,
             border: Border.all(
               color: active
                   ? AppColors.primary.withValues(alpha: .35)
@@ -312,26 +268,26 @@ class _NavItemState extends State<_NavItem> {
             ),
           ),
           child: Row(
-            mainAxisAlignment: widget.compact
+            mainAxisAlignment: compact
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
             children: [
-              Icon(widget.destination.icon, size: 20, color: fg),
-              if (!widget.compact) ...[
+              Icon(destination.icon, size: 20, color: foregroundColor),
+              if (!compact) ...[
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    widget.destination.label,
+                    destination.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: fg,
+                      color: foregroundColor,
                       fontSize: 14,
                       fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                 ),
-                if (widget.badge != null)
+                if (badge != null)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -342,7 +298,7 @@ class _NavItemState extends State<_NavItem> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      widget.badge!,
+                      badge!,
                       style: const TextStyle(
                         color: AppColors.primary,
                         fontSize: 11,
@@ -357,18 +313,23 @@ class _NavItemState extends State<_NavItem> {
       ),
     );
 
-    if (widget.compact) {
+    if (compact) {
       item = Tooltip(
-        message: widget.destination.label,
+        message: destination.label,
         preferBelow: false,
         child: item,
       );
     }
+
     return item;
   }
 }
 
-class _ActionItem extends StatefulWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// ACTION ITEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ActionItem extends StatelessWidget {
   const _ActionItem({
     required this.icon,
     required this.label,
@@ -384,47 +345,33 @@ class _ActionItem extends StatefulWidget {
   final Color color;
 
   @override
-  State<_ActionItem> createState() => _ActionItemState();
-}
-
-class _ActionItemState extends State<_ActionItem> {
-  bool _hover = false;
-
-  @override
   Widget build(BuildContext context) {
-    final item = MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+    Widget item = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        hoverColor: color.withValues(alpha: .08),
+        splashColor: color.withValues(alpha: .12),
+        child: Container(
           margin: const EdgeInsets.symmetric(vertical: 2),
           height: 42,
-          padding: EdgeInsets.symmetric(horizontal: widget.compact ? 0 : 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            color: _hover
-                ? widget.color.withValues(alpha: .08)
-                : Colors.transparent,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 0 : 12),
           child: Row(
-            mainAxisAlignment: widget.compact
+            mainAxisAlignment: compact
                 ? MainAxisAlignment.center
                 : MainAxisAlignment.start,
             children: [
-              Icon(widget.icon, size: 19, color: widget.color),
-              if (!widget.compact) ...[
+              Icon(icon, size: 19, color: color),
+              if (!compact) ...[
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    widget.label,
+                    label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: widget.color,
+                      color: color,
                       fontSize: 13.5,
                       fontWeight: FontWeight.w500,
                     ),
@@ -436,11 +383,18 @@ class _ActionItemState extends State<_ActionItem> {
         ),
       ),
     );
-    return widget.compact
-        ? Tooltip(message: widget.label, preferBelow: false, child: item)
-        : item;
+
+    if (compact) {
+      item = Tooltip(message: label, preferBelow: false, child: item);
+    }
+
+    return item;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// USAGE CARD
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _UsageCard extends StatelessWidget {
   const _UsageCard();

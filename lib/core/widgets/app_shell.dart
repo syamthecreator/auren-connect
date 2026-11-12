@@ -3,14 +3,14 @@ import 'dart:html' as html;
 
 import 'package:auren_connect/app/routes/app_router.dart';
 import 'package:auren_connect/app/theme/app_colors.dart';
+import 'package:auren_connect/core/controller/core_ui_provider.dart';
+import 'package:auren_connect/core/utils/shell_scope.dart';
 import 'package:auren_connect/core/widgets/app_sidebar.dart';
 import 'package:auren_connect/core/widgets/app_top_bar.dart';
-import 'package:auren_connect/core/utils/shell_scope.dart';
 import 'package:auren_connect/features/auth/controllers/auth_controller.dart';
 import 'package:auren_connect/features/automation/presentation/screens/automation_screen.dart';
 import 'package:auren_connect/features/channel/presentation/screens/channel_screen.dart';
 import 'package:auren_connect/features/inbox/presentation/screens/inbox_screen.dart';
-import 'package:auren_connect/features/overview/presentation/screens/overview_screen.dart';
 import 'package:auren_connect/features/settings/presentation/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -26,58 +26,44 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  late NavDestination _current;
-
-  bool? _collapsedOverride;
-  bool _showNotifications = false;
-
   @override
   void initState() {
     super.initState();
-    if (widget.initialDestination != null) {
-      _current = widget.initialDestination!;
-    } else {
-      _current = NavDestination.overview;
+
+    _initializeDestination();
+  }
+
+  /// Initializes navigation from the supplied destination or OAuth callback.
+  void _initializeDestination() {
+    NavDestination? destination = widget.initialDestination;
+
+    if (destination == null) {
       try {
         final uri = Uri.base;
         final href = html.window.location.href;
+
         if (uri.queryParameters['tab'] == 'channel' ||
             uri.queryParameters.containsKey('connected') ||
             uri.fragment.contains('channel') ||
             href.contains('tab=channel') ||
             href.contains('connected=true')) {
-          _current = NavDestination.channel;
+          destination = NavDestination.channel;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('AppShell URL initialization error: $e');
+      }
     }
-  }
 
-  bool get _collapsed =>
-      _collapsedOverride ?? MediaQuery.of(context).size.width < 1000;
+    if (destination == null) return;
 
-  void _goTo(NavDestination destination) {
-    if (_current == destination) return;
-    setState(() {
-      _current = destination;
-      _showNotifications = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      context.read<CoreUiProvider>().goTo(destination!);
     });
   }
 
-  Widget _page() {
-    return switch (_current) {
-      NavDestination.overview => const OverviewScreen(),
-      NavDestination.automations => const AutomationsScreen(),
-      NavDestination.channel => const ChannelScreen(),
-      NavDestination.inbox => const InboxScreen(),
-      NavDestination.settings => const SettingsScreen(),
-    };
-  }
-
-  void _toggleSidebar() => setState(() => _collapsedOverride = !_collapsed);
-
-  void _toggleNotifications() =>
-      setState(() => _showNotifications = !_showNotifications);
-
+  /// Handles logout.
   Future<void> _logout() async {
     await context.read<AuthController>().signOut();
 
@@ -87,81 +73,108 @@ class _AppShellState extends State<AppShell> {
         .pushNamedAndRemoveUntil(AppRouter.auth, (route) => false);
   }
 
+  /// Returns the selected page.
+  Widget _page(NavDestination destination) {
+    return switch (destination) {
+      NavDestination.automations => const AutomationsScreen(),
+      NavDestination.channel => const ChannelScreen(),
+      NavDestination.inbox => const InboxScreen(),
+      NavDestination.settings => const SettingsScreen(),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ShellScope(
-      goTo: _goTo,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: Stack(
-          children: [
-            // Ambient glow behind the content
-            Positioned(
-              top: -180,
-              right: -120,
-              child: IgnorePointer(
-                child: Container(
-                  width: 520,
-                  height: 520,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        AppColors.primary.withValues(alpha: .10),
-                        Colors.transparent,
-                      ],
+    return Consumer<CoreUiProvider>(
+      builder: (context, core, child) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final collapsed = core.isSidebarCollapsed(screenWidth);
+
+        return ShellScope(
+          goTo: core.goTo,
+          child: Scaffold(
+            backgroundColor: AppColors.background,
+            body: Stack(
+              children: [
+                // Ambient glow behind the content.
+                Positioned(
+                  top: -180,
+                  right: -120,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 520,
+                      height: 520,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            AppColors.primary.withValues(alpha: .10),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            Row(
-              children: [
-                AppSidebar(
-                  collapsed: _collapsed,
-                  current: _current,
-                  onToggle: _toggleSidebar,
-                  onSelect: _goTo,
-                  onLogout: _logout,
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
-                        child: AppTopBar(
-                          destination: _current,
-                          notificationCount: 1,
-                          onBellTap: _toggleNotifications,
-                        ),
-                      ),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          child: KeyedSubtree(
-                            key: ValueKey(_current),
-                            child: _page(),
+
+                Row(
+                  children: [
+                    AppSidebar(
+                      collapsed: collapsed,
+                      current: core.currentDestination,
+                      onToggle: () => core.toggleSidebar(screenWidth),
+                      onSelect: core.goTo,
+                      onLogout: _logout,
+                    ),
+
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 14, 24, 0),
+                            child: AppTopBar(
+                              destination: core.currentDestination,
+                              notificationCount: 1,
+                              onBellTap: core.toggleNotifications,
+                            ),
                           ),
-                        ),
+
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              child: KeyedSubtree(
+                                key: ValueKey(core.currentDestination),
+                                child: _page(core.currentDestination),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+
+                // Notification overlay.
+                if (core.showNotifications) ...[
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: core.closeNotifications,
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+
+                  const Positioned(
+                    top: 76,
+                    right: 24,
+                    child: _NotificationPanel(),
+                  ),
+                ],
               ],
             ),
-            if (_showNotifications) ...[
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _toggleNotifications,
-                  child: const SizedBox.expand(),
-                ),
-              ),
-              const Positioned(top: 76, right: 24, child: _NotificationPanel()),
-            ],
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -194,6 +207,7 @@ class _NotificationPanel extends StatelessWidget {
         '3h',
       ),
     ];
+
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 180),
@@ -248,7 +262,8 @@ class _NotificationPanel extends StatelessWidget {
                 ],
               ),
             ),
-            for (final i in items)
+
+            for (final item in items)
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 2),
                 padding: const EdgeInsets.all(12),
@@ -263,18 +278,20 @@ class _NotificationPanel extends StatelessWidget {
                       width: 34,
                       height: 34,
                       decoration: BoxDecoration(
-                        color: i.$2.withValues(alpha: .14),
+                        color: item.$2.withValues(alpha: .14),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(i.$1, size: 18, color: i.$2),
+                      child: Icon(item.$1, size: 18, color: item.$2),
                     ),
+
                     const SizedBox(width: 12),
+
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            i.$3,
+                            item.$3,
                             style: const TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 13.5,
@@ -283,7 +300,7 @@ class _NotificationPanel extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            i.$4,
+                            item.$4,
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12.5,
@@ -293,9 +310,11 @@ class _NotificationPanel extends StatelessWidget {
                         ],
                       ),
                     ),
+
                     const SizedBox(width: 8),
+
                     Text(
-                      i.$5,
+                      item.$5,
                       style: const TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 11.5,

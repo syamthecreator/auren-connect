@@ -31,10 +31,6 @@ class _AuthScreenState extends State<AuthScreen> {
   final _newPasswordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
 
-  bool _hidePassword = true;
-  bool _hideNewPassword = true;
-  bool _hideConfirmPassword = true;
-
   @override
   void dispose() {
     _usernameCtrl.dispose();
@@ -271,14 +267,11 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _passwordCtrl,
           prefixIcon: RemixIcons.lock_line,
           hint: 'Enter your password',
-          obscureText: _hidePassword,
+          obscureText: auth.hidePassword,
           autofillHints: const [AutofillHints.password],
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _signIn(),
-          suffix: _eyeButton(
-            _hidePassword,
-            () => setState(() => _hidePassword = !_hidePassword),
-          ),
+          suffix: _eyeButton(auth.hidePassword, auth.togglePasswordVisibility),
         ),
         const SizedBox(height: 8),
         Align(
@@ -422,11 +415,11 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _newPasswordCtrl,
           prefixIcon: RemixIcons.lock_line,
           hint: 'Minimum 6 characters',
-          obscureText: _hideNewPassword,
+          obscureText: auth.hideNewPassword,
           textInputAction: TextInputAction.next,
           suffix: _eyeButton(
-            _hideNewPassword,
-            () => setState(() => _hideNewPassword = !_hideNewPassword),
+            auth.hideNewPassword,
+            auth.toggleNewPasswordVisibility,
           ),
         ),
         const SizedBox(height: 14),
@@ -435,12 +428,12 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _confirmPasswordCtrl,
           prefixIcon: RemixIcons.lock_line,
           hint: 'Re-enter your password',
-          obscureText: _hideConfirmPassword,
+          obscureText: auth.hideConfirmPassword,
           textInputAction: TextInputAction.done,
           onSubmitted: (_) => _resetPassword(),
           suffix: _eyeButton(
-            _hideConfirmPassword,
-            () => setState(() => _hideConfirmPassword = !_hideConfirmPassword),
+            auth.hideConfirmPassword,
+            auth.toggleConfirmPasswordVisibility,
           ),
         ),
         const SizedBox(height: 20),

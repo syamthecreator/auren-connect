@@ -786,3 +786,4 @@ curl "https://auren-backend-5weg.onrender.com/api/v1/automations/<AUTOMATION_ID>
 curl -X DELETE https://auren-backend-5weg.onrender.com/api/v1/automations/<AUTOMATION_ID> \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
+

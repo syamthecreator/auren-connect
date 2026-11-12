@@ -27,111 +27,127 @@ class ChannelScreen extends StatefulWidget {
 }
 
 class _ChannelScreenState extends State<ChannelScreen> {
-  int _selectedFilter = 0; // 0: All, 1: Instagram, 2: WhatsApp
-  bool _showInstagramConnectView = false;
-
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<ChannelController>().loadChannels();
     });
   }
 
-  void _copyToClipboard(String text, String label) {
-    Clipboard.setData(ClipboardData(text: text));
-    AppSnackBar.info(context, '$label copied to clipboard');
-  }
+  @override
+  Widget build(BuildContext context) {
+    final channelController = context.watch<ChannelController>();
 
-  Future<void> _syncChannels() async {
-    final controller = context.read<ChannelController>();
-    await controller.syncChannels();
-    if (!mounted) return;
-    if (controller.errorMessage != null) {
-      AppSnackBar.error(context, controller.errorMessage!);
-    } else {
-      AppSnackBar.success(
-        context,
-        controller.successMessage ?? 'Channels synchronized successfully',
+    if (channelController.showInstagramConnectView) {
+      return ManyChatInstagramConnectView(
+        onBack: channelController.closeInstagramConnectView,
+        onConnected: () {
+          channelController.closeInstagramConnectView();
+          channelController.loadChannels();
+        },
       );
     }
-  }
 
-  void _showInstagramDisconnectDialog(String channelId, String handle) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: const BorderSide(color: AppColors.border),
-        ),
-        title: Row(
-          children: [
-            const StudioIconBox(
-              RemixIcons.error_warning_line,
-              AppColors.error,
-              size: 38,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Disconnect Channel',
-                style: AppTextStyles.t(18, w: FontWeight.w700),
+    Future<void> syncChannels() async {
+      final controller = context.read<ChannelController>();
+
+      await controller.syncChannels();
+
+      if (!mounted) return;
+
+      if (controller.errorMessage != null) {
+        // ignore: use_build_context_synchronously
+        AppSnackBar.error(context, controller.errorMessage!);
+      } else {
+        AppSnackBar.success(
+          // ignore: use_build_context_synchronously
+          context,
+          controller.successMessage ?? 'Channels synchronized successfully',
+        );
+      }
+    }
+
+    void copyToClipboard(String text, String label) {
+      Clipboard.setData(ClipboardData(text: text));
+
+      AppSnackBar.info(context, '$label copied to clipboard');
+    }
+
+    void showInstagramDisconnectDialog(String channelId, String handle) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: AppColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: AppColors.border),
+          ),
+          title: Row(
+            children: [
+              const StudioIconBox(
+                RemixIcons.error_warning_line,
+                AppColors.error,
+                size: 38,
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Disconnect Channel',
+                  style: AppTextStyles.t(18, w: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'Are you sure you want to unlink $handle? '
+            'Automated message flows and triggers for this account will stop running.',
+            style: AppTextStyles.t(14, c: AppColors.textSecondary, h: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(
+                'Cancel',
+                style: AppTextStyles.t(14, c: AppColors.textSecondary),
+              ),
+            ),
+            GradientButton(
+              label: 'Disconnect',
+              icon: RemixIcons.shut_down_line,
+              onTap: () async {
+                Navigator.of(dialogContext).pop();
+
+                final success = await context
+                    .read<ChannelController>()
+                    .disconnectInstagram(channelId);
+
+                if (!mounted) return;
+
+                if (success) {
+                  // ignore: use_build_context_synchronously
+                  AppSnackBar.success(context, 'Channel disconnected');
+                } else {
+                  AppSnackBar.error(
+                    // ignore: use_build_context_synchronously
+                    context,
+                    // ignore: use_build_context_synchronously
+                    context.read<ChannelController>().errorMessage ??
+                        'Failed to disconnect channel',
+                  );
+                }
+              },
             ),
           ],
         ),
-        content: Text(
-          'Are you sure you want to unlink $handle? Automated message flows and triggers for this account will stop running.',
-          style: AppTextStyles.t(14, c: AppColors.textSecondary, h: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(
-              'Cancel',
-              style: AppTextStyles.t(14, c: AppColors.textSecondary),
-            ),
-          ),
-          GradientButton(
-            label: 'Disconnect',
-            icon: RemixIcons.shut_down_line,
-            onTap: () async {
-              Navigator.of(ctx).pop();
-              final success = await context
-                  .read<ChannelController>()
-                  .disconnectInstagram(channelId);
-              if (!mounted) return;
-              if (success) {
-                AppSnackBar.success(context, 'Channel disconnected');
-              } else {
-                AppSnackBar.error(
-                  context,
-                  context.read<ChannelController>().errorMessage ??
-                      'Failed to disconnect channel',
-                );
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_showInstagramConnectView) {
-      return ManyChatInstagramConnectView(
-        onBack: () => setState(() => _showInstagramConnectView = false),
-        onConnected: () => setState(() => _showInstagramConnectView = false),
       );
     }
 
-    final channelController = context.watch<ChannelController>();
     final accounts = channelController.instagramAccounts;
     final isIgConnected = accounts.isNotEmpty;
-    final primaryAccount = isIgConnected ? accounts.first : null;
+    final primaryAccount = channelController.primaryInstagramAccount;
     final isSyncing = channelController.isSyncing;
 
     return StudioPage(
@@ -142,12 +158,12 @@ class _ChannelScreenState extends State<ChannelScreen> {
             GhostButton(
               label: isSyncing ? 'Syncing...' : 'Sync Channels',
               icon: RemixIcons.refresh_line,
-              onTap: isSyncing ? null : _syncChannels,
+              onTap: isSyncing ? null : syncChannels,
             ),
             GradientButton(
               label: 'Connect Channel',
               icon: RemixIcons.add_line,
-              onTap: () => setState(() => _showInstagramConnectView = true),
+              onTap: channelController.openInstagramConnectView,
             ),
           ],
         ),
@@ -158,8 +174,8 @@ class _ChannelScreenState extends State<ChannelScreen> {
           igHandle: primaryAccount?.displayHandle ?? 'Not connected',
           accountCount: accounts.length,
           isSyncing: isSyncing,
-          onConnectTap: () => setState(() => _showInstagramConnectView = true),
-          onSyncTap: isSyncing ? null : _syncChannels,
+          onConnectTap: channelController.openInstagramConnectView,
+          onSyncTap: isSyncing ? null : syncChannels,
         ),
 
         // 3. Filter Chips
@@ -169,8 +185,8 @@ class _ChannelScreenState extends State<ChannelScreen> {
             'Instagram (${accounts.length})',
             'WhatsApp (0)',
           ],
-          selected: _selectedFilter,
-          onChanged: (idx) => setState(() => _selectedFilter = idx),
+          selected: channelController.selectedFilter,
+          onChanged: channelController.selectFilter,
         ),
 
         // 4. Main Connected Channel Cards (Real values only)
@@ -188,29 +204,30 @@ class _ChannelScreenState extends State<ChannelScreen> {
             spacing: 20,
             children: [
               // Instagram Accounts (Show each real connected account or empty state)
-              if (_selectedFilter == 0 || _selectedFilter == 1) ...[
+              if (channelController.selectedFilter == 0 ||
+                  channelController.selectedFilter == 1) ...[
                 if (accounts.isNotEmpty)
                   ...accounts.map(
                     (account) => _InstagramChannelCard(
                       account: account,
-                      onDisconnect: () => _showInstagramDisconnectDialog(
+                      onDisconnect: () => showInstagramDisconnectDialog(
                         account.id,
                         account.displayHandle,
                       ),
                       onCopyId: (id) =>
-                          _copyToClipboard(id, 'Instagram User ID'),
-                      onSync: isSyncing ? null : _syncChannels,
+                          copyToClipboard(id, 'Instagram User ID'),
+                      onSync: isSyncing ? null : syncChannels,
                     ),
                   )
                 else
                   _EmptyInstagramChannelCard(
-                    onConnect: () =>
-                        setState(() => _showInstagramConnectView = true),
+                    onConnect: channelController.openInstagramConnectView,
                   ),
               ],
 
               // WhatsApp Card (Honest "Coming Soon", zero dummy toggles or fake metrics)
-              if (_selectedFilter == 0 || _selectedFilter == 2)
+              if (channelController.selectedFilter == 0 ||
+                  channelController.selectedFilter == 2)
                 const _WhatsAppComingSoonCard(),
             ],
           ),
@@ -268,7 +285,9 @@ class _ChannelHeroBanner extends StatelessWidget {
                     igConnected
                         ? '$accountCount Instagram Connected'
                         : 'No Channels Connected',
-                    color: igConnected ? AppColors.igColor : AppColors.textMuted,
+                    color: igConnected
+                        ? AppColors.igColor
+                        : AppColors.textMuted,
                     icon: igConnected
                         ? RemixIcons.instagram_line
                         : RemixIcons.links_line,
@@ -336,12 +355,16 @@ class _ChannelHeroBanner extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: igConnected ? AppColors.success : AppColors.textMuted,
+                        color: igConnected
+                            ? AppColors.success
+                            : AppColors.textMuted,
                         shape: BoxShape.circle,
                         boxShadow: igConnected
                             ? [
                                 BoxShadow(
-                                  color: AppColors.success.withValues(alpha: .7),
+                                  color: AppColors.success.withValues(
+                                    alpha: .7,
+                                  ),
                                   blurRadius: 8,
                                 ),
                               ]
@@ -445,8 +468,18 @@ class _InstagramChannelCard extends StatelessWidget {
 
   String _formatDate(DateTime dt) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
@@ -550,7 +583,10 @@ class _InstagramChannelCard extends StatelessWidget {
                         children: [
                           Text(
                             'Connected Date',
-                            style: AppTextStyles.t(11.5, c: AppColors.textMuted),
+                            style: AppTextStyles.t(
+                              11.5,
+                              c: AppColors.textMuted,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Row(
@@ -563,7 +599,10 @@ class _InstagramChannelCard extends StatelessWidget {
                               const SizedBox(width: 6),
                               Text(
                                 connectedDateStr,
-                                style: AppTextStyles.t(12.5, w: FontWeight.w600),
+                                style: AppTextStyles.t(
+                                  12.5,
+                                  w: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
