@@ -8,6 +8,7 @@ import 'package:auren_connect/features/auth/controllers/auth_controller.dart';
 import 'package:auren_connect/features/automation/controller/automation_provider.dart';
 import 'package:auren_connect/features/channel/controller/channel_controller.dart';
 import 'package:auren_connect/features/channel/service/channel_api_service.dart';
+import 'package:auren_connect/features/automation/service/automation_api_service.dart';
 import 'package:auren_connect/features/splash/controller/splash_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -66,8 +67,15 @@ class AurenConnectApp extends StatelessWidget {
         ),
 
         // Automation
+        Provider<AutomationApiService>(
+          create: (context) =>
+              AutomationApiService(apiClient: context.read<ApiClient>()),
+        ),
+
         ChangeNotifierProvider<AutomationProvider>(
-          create: (_) => AutomationProvider(),
+          create: (context) => AutomationProvider(
+            automationApiService: context.read<AutomationApiService>(),
+          )..loadAutomations(),
         ),
       ],
       child: MaterialApp(

@@ -2,6 +2,7 @@ import 'package:auren_connect/features/automation/controller/automation_provider
 import 'package:auren_connect/features/automation/data/models/automation_enums.dart';
 import 'package:auren_connect/features/automation/data/models/automation_model.dart';
 import 'package:auren_connect/features/automation/data/models/flow_step_model.dart';
+import 'package:auren_connect/features/channel/controller/channel_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
@@ -164,37 +165,91 @@ class AutomationsScreen extends StatefulWidget {
 class _AutomationsScreenState extends State<AutomationsScreen> {
   AutomationProvider get _provider => context.read<AutomationProvider>();
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _provider.loadAutomations();
+      context.read<ChannelController>().loadChannels();
+    });
+  }
+
   void _openBuilder({Automation? existing, Automation? prefilled}) {
+    if (existing == null && prefilled == null) {
+      final channelCtrl = context.read<ChannelController>();
+      final primary = channelCtrl.primaryInstagramAccount;
+      if (primary != null) {
+        prefilled = Automation(
+          id: _newId(),
+          channelId: primary.id,
+          channelUsername: primary.displayHandle,
+        );
+      }
+    }
     _provider.openBuilder(existing: existing, prefilled: prefilled);
   }
 
   void _closeBuilder() => _provider.closeBuilder();
 
-  void _saveAutomation(Automation automation) {
-    _provider.saveAutomation(automation);
+  Future<void> _saveAutomation(Automation automation) async {
+    final channelCtrl = context.read<ChannelController>();
+    if (automation.channelId == null || automation.channelId!.isEmpty) {
+      final primary = channelCtrl.primaryInstagramAccount;
+      if (primary != null) {
+        automation.channelId = primary.id;
+        automation.channelUsername = primary.displayHandle;
+      }
+    }
 
-    AppSnackBar.success(
-      context,
-      automation.status == AutomationStatus.active
-          ? 'Automation published and running'
-          : 'Draft saved',
-    );
+    final success = await _provider.saveAutomation(automation);
+    if (!mounted) return;
+
+    if (success) {
+      AppSnackBar.success(
+        context,
+        automation.status == AutomationStatus.active
+            ? 'Automation published and active on Instagram'
+            : 'Draft saved successfully',
+      );
+    } else {
+      AppSnackBar.error(
+        context,
+        _provider.errorMessage ?? 'Failed to save automation',
+      );
+    }
   }
 
-  void _toggleStatus(Automation automation, bool enabled) {
-    _provider.toggleStatus(automation, enabled);
+  Future<void> _toggleStatus(Automation automation, bool enabled) async {
+    final success = await _provider.toggleStatus(automation, enabled);
+    if (!mounted) return;
 
-    AppSnackBar.info(
-      context,
-      enabled
-          ? '"${automation.name}" is now active'
-          : '"${automation.name}" paused',
-    );
+    if (success) {
+      AppSnackBar.info(
+        context,
+        enabled
+            ? '"${automation.name}" is now active'
+            : '"${automation.name}" paused',
+      );
+    } else {
+      AppSnackBar.error(
+        context,
+        _provider.errorMessage ?? 'Failed to toggle status',
+      );
+    }
   }
 
-  void _duplicate(Automation automation) {
-    _provider.duplicateAutomation(automation);
-    AppSnackBar.success(context, 'Automation duplicated as draft');
+  Future<void> _duplicate(Automation automation) async {
+    final success = await _provider.duplicateAutomation(automation);
+    if (!mounted) return;
+
+    if (success) {
+      AppSnackBar.success(context, 'Automation duplicated as draft');
+    } else {
+      AppSnackBar.error(
+        context,
+        _provider.errorMessage ?? 'Failed to duplicate automation',
+      );
+    }
   }
 
   void _confirmDelete(Automation automation) {
@@ -237,10 +292,19 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
           GradientButton(
             label: 'Delete',
             icon: RemixIcons.delete_bin_line,
-            onTap: () {
+            onTap: () async {
               Navigator.of(ctx).pop();
-              _provider.deleteAutomation(automation.id);
-              AppSnackBar.success(context, 'Automation deleted');
+              final success = await _provider.deleteAutomation(automation.id);
+              if (!mounted) return;
+
+              if (success) {
+                AppSnackBar.success(context, 'Automation deleted');
+              } else {
+                AppSnackBar.error(
+                  context,
+                  _provider.errorMessage ?? 'Failed to delete automation',
+                );
+              }
             },
           ),
         ],
@@ -341,6 +405,15 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
           );
         }
 
+        if (provider.isLoading && provider.items.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(60),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
+        }
+
         final active = provider.activeCount;
         final paused = provider.pausedCount;
         final drafts = provider.draftCount;
@@ -352,6 +425,11 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
           children: [
             StudioPageHeading(
               actions: [
+                GhostButton(
+                  label: 'Refresh',
+                  icon: RemixIcons.refresh_line,
+                  onTap: () => provider.loadAutomations(),
+                ),
                 GhostButton(
                   label: 'Browse recipes',
                   icon: RemixIcons.magic_line,
@@ -1459,14 +1537,16 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
                       onTap: _showPreviewDialog,
                     ),
                   GhostButton(
-                    label: 'Save draft',
+                    label: _provider.isSaving ? 'Saving...' : 'Save draft',
                     icon: RemixIcons.save_line,
-                    onTap: _saveDraft,
+                    onTap: _provider.isSaving ? null : _saveDraft,
                   ),
                   GradientButton(
-                    label: widget.isEdit ? 'Update & publish' : 'Publish',
+                    label: _provider.isSaving
+                        ? 'Publishing...'
+                        : (widget.isEdit ? 'Update & publish' : 'Publish'),
                     icon: RemixIcons.rocket_line,
-                    onTap: _publish,
+                    onTap: _provider.isSaving ? null : _publish,
                   ),
                 ],
               ),
@@ -1569,7 +1649,14 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
                 icon: RemixIcons.instagram_line,
                 color: AppColors.igColor,
                 title: 'Instagram',
-                subtitle: 'Comments, DMs, stories',
+                subtitle: _automation.channelUsername != null &&
+                        _automation.channelUsername!.isNotEmpty
+                    ? '@${_automation.channelUsername!.replaceFirst('@', '')}'
+                    : (context
+                                .watch<ChannelController>()
+                                .primaryInstagramAccount
+                                ?.displayHandle ??
+                            'Comments, DMs, stories'),
                 selected: true,
                 onTap: () {},
               ),
@@ -2340,6 +2427,10 @@ class _InstagramPhoneState extends State<_InstagramPhone> {
         rows.add(const _ChatRow(_RowKind.message, text: 'Love this!'));
       case TriggerType.storyMention:
         rows.add(const _ChatRow(_RowKind.storyCard, mention: true));
+      case TriggerType.welcomeMessage:
+        rows.add(const _ChatRow(_RowKind.message, text: 'Hello! I am interested.'));
+      case TriggerType.fallbackDefault:
+        rows.add(const _ChatRow(_RowKind.message, text: 'Can you help me?'));
     }
 
     for (final s in widget.steps) {

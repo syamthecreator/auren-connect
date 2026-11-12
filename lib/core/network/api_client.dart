@@ -36,6 +36,14 @@ class ApiClient {
     return _request('PUT', endpoint, body: body, requiresAuth: requiresAuth);
   }
 
+  Future<Map<String, dynamic>> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+    bool requiresAuth = false,
+  }) {
+    return _request('PATCH', endpoint, body: body, requiresAuth: requiresAuth);
+  }
+
   Future<Map<String, dynamic>> delete(
     String endpoint, {
     bool requiresAuth = false,
@@ -90,6 +98,12 @@ class ApiClient {
         case 'PUT':
           response = await _client
               .put(uri, headers: headers, body: encodedBody)
+              .timeout(ApiConstants.receiveTimeout);
+          break;
+
+        case 'PATCH':
+          response = await _client
+              .patch(uri, headers: headers, body: encodedBody)
               .timeout(ApiConstants.receiveTimeout);
           break;
 

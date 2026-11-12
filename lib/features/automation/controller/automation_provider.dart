@@ -3,10 +3,39 @@ import 'package:flutter/material.dart';
 import 'package:auren_connect/features/automation/data/models/automation_enums.dart';
 import 'package:auren_connect/features/automation/data/models/automation_model.dart';
 import 'package:auren_connect/features/automation/data/models/flow_step_model.dart';
+import 'package:auren_connect/features/automation/service/automation_api_service.dart';
 
 class AutomationProvider extends ChangeNotifier {
   static const int maxSteps = 8;
   static const int maxQuickReplies = 3;
+
+  AutomationProvider({AutomationApiService? automationApiService})
+      : _apiService = automationApiService {
+    searchController.addListener(_onSearchChanged);
+  }
+
+  final AutomationApiService? _apiService;
+
+  // ---------------------------------------------------------------------------
+  // NETWORK & LOADING STATE
+  // ---------------------------------------------------------------------------
+
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  bool _isSaving = false;
+  bool get isSaving => _isSaving;
+
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+
+  Map<String, dynamic>? _analytics;
+  Map<String, dynamic>? get analytics => _analytics;
+
+  void clearError() {
+    _errorMessage = null;
+    notifyListeners();
+  }
 
   // ---------------------------------------------------------------------------
   // AUTOMATION LIST STATE
@@ -59,10 +88,6 @@ class AutomationProvider extends ChangeNotifier {
 
   TextEditingController optionController(String stepId) {
     return _optionControllers.putIfAbsent(stepId, TextEditingController.new);
-  }
-
-  AutomationProvider() {
-    searchController.addListener(_onSearchChanged);
   }
 
   void _onSearchChanged() {
@@ -499,15 +524,30 @@ class AutomationProvider extends ChangeNotifier {
       name: draft.name.trim().isEmpty
           ? 'Untitled automation'
           : draft.name.trim(),
+      description: draft.description,
+      channelId: draft.channelId,
+      channelUsername: draft.channelUsername,
       trigger: draft.trigger,
       keywords: List<String>.of(draft.keywords),
       exactMatch: draft.exactMatch,
       oncePerUser: draft.oncePerUser,
       pauseOnHuman: draft.pauseOnHuman,
+      targetPostId: draft.targetPostId,
       steps: draft.steps.map((step) => step.copy()).toList(),
       status: status,
       messagesSent: draft.messagesSent,
+      successRuns: draft.successRuns,
+      failedRuns: draft.failedRuns,
+      createdAt: draft.createdAt,
+      updatedAt: draft.updatedAt,
     );
+  }
+
+  void setDraftChannel(String? channelId, {String? channelUsername}) {
+    if (_builderDraft == null) return;
+    _builderDraft!.channelId = channelId;
+    _builderDraft!.channelUsername = channelUsername;
+    notifyListeners();
   }
 
   AutomationStatus get draftSaveStatus {
@@ -527,62 +567,174 @@ class AutomationProvider extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // SAVE AUTOMATION
+  // BACKEND INTEGRATION: LOAD, SAVE, TOGGLE, DELETE
   // ---------------------------------------------------------------------------
 
-  void saveAutomation(Automation automation) {
-    final index = _items.indexWhere((item) => item.id == automation.id);
+  Future<void> loadAutomations() async {
+    if (_apiService == null) return;
 
-    if (index >= 0) {
-      _items[index] = automation;
-    } else {
-      _items.insert(0, automation);
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final automations = await _apiService.getAutomations();
+      _items
+        ..clear()
+        ..addAll(automations);
+
+      await _loadAnalytics();
+    } catch (e) {
+      debugPrint('AutomationProvider.loadAutomations error: $e');
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadAnalytics() async {
+    if (_apiService == null) return;
+    try {
+      _analytics = await _apiService.getAnalyticsOverview();
+    } catch (_) {}
+  }
+
+  Future<bool> saveAutomation(Automation automation) async {
+    _isSaving = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      // Check if existing on backend (valid UUID is > 20 characters)
+      final isExisting = _builderIsEdit && automation.id.length > 20;
+
+      if (_apiService != null) {
+        if (isExisting) {
+          final updated = await _apiService.updateAutomation(
+            automation.id,
+            automation,
+          );
+          final index = _items.indexWhere((item) => item.id == updated.id);
+          if (index >= 0) {
+            _items[index] = updated;
+          } else {
+            _items.insert(0, updated);
+          }
+        } else {
+          final created = await _apiService.createAutomation(automation);
+          _items.insert(0, created);
+        }
+      } else {
+        final index = _items.indexWhere((item) => item.id == automation.id);
+        if (index >= 0) {
+          _items[index] = automation;
+        } else {
+          _items.insert(0, automation);
+        }
+      }
+
+      closeBuilder();
+      await _loadAnalytics();
+      _isSaving = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('AutomationProvider.saveAutomation error: $e');
+      _errorMessage = e.toString();
+      _isSaving = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleStatus(Automation automation, bool enabled) async {
+    final index = _items.indexWhere((item) => item.id == automation.id);
+    if (index < 0) return false;
+
+    final previousStatus = _items[index].status;
+    _items[index].status =
+        enabled ? AutomationStatus.active : AutomationStatus.paused;
+    notifyListeners();
+
+    if (_apiService != null && automation.id.length > 20) {
+      try {
+        final newStatus = await _apiService.toggleAutomation(automation.id);
+        _items[index].status = newStatus;
+        notifyListeners();
+        return true;
+      } catch (e) {
+        _items[index].status = previousStatus;
+        _errorMessage = e.toString();
+        notifyListeners();
+        return false;
+      }
     }
 
-    closeBuilder();
+    return true;
   }
 
-  // ---------------------------------------------------------------------------
-  // TOGGLE STATUS
-  // ---------------------------------------------------------------------------
-
-  void toggleStatus(Automation automation, bool enabled) {
-    final index = _items.indexWhere((item) => item.id == automation.id);
-
-    if (index < 0) return;
-
-    _items[index].status = enabled
-        ? AutomationStatus.active
-        : AutomationStatus.paused;
-
+  Future<bool> duplicateAutomation(Automation automation) async {
+    _isLoading = true;
     notifyListeners();
-  }
 
-  // ---------------------------------------------------------------------------
-  // DUPLICATE
-  // ---------------------------------------------------------------------------
-
-  void duplicateAutomation(Automation automation) {
     final copy = automation.copy(
       id: _newId(),
       name: '${automation.name} (copy)',
     );
-
     copy.status = AutomationStatus.draft;
     copy.messagesSent = 0;
 
-    _items.insert(0, copy);
-
-    notifyListeners();
+    try {
+      if (_apiService != null) {
+        final created = await _apiService.createAutomation(copy);
+        _items.insert(0, created);
+      } else {
+        _items.insert(0, copy);
+      }
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('AutomationProvider.duplicateAutomation error: $e');
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // DELETE
-  // ---------------------------------------------------------------------------
+  Future<bool> deleteAutomation(String id) async {
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index < 0) return false;
 
-  void deleteAutomation(String id) {
-    _items.removeWhere((item) => item.id == id);
+    final removed = _items.removeAt(index);
     notifyListeners();
+
+    if (_apiService != null && id.length > 20) {
+      try {
+        await _apiService.deleteAutomation(id);
+        await _loadAnalytics();
+        return true;
+      } catch (e) {
+        _items.insert(index, removed);
+        _errorMessage = e.toString();
+        notifyListeners();
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  Future<List<Map<String, dynamic>>> loadLogs(String id) async {
+    if (_apiService == null || id.length <= 20) return [];
+    try {
+      return await _apiService.getAutomationLogs(id);
+    } catch (e) {
+      debugPrint('AutomationProvider.loadLogs error: $e');
+      return [];
+    }
   }
 
   // ---------------------------------------------------------------------------
