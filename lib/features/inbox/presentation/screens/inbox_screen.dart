@@ -1,540 +1,549 @@
-// ════════════════════════════════════════════════════════════════════════════
-//  3. INBOX
-// ════════════════════════════════════════════════════════════════════════════
+import 'package:auren_connect/core/widgets/ghost_button.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:remixicon/remixicon.dart';
 
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/app/theme/app_input_decorations.dart';
 import 'package:auren_connect/app/theme/app_text_styles.dart';
 import 'package:auren_connect/core/utils/helper.dart';
-import 'package:auren_connect/core/widgets/ghost_button.dart';
-import 'package:auren_connect/core/widgets/gradient_button.dart';
 import 'package:auren_connect/core/widgets/studio_avatar.dart';
 import 'package:auren_connect/core/widgets/studio_card.dart';
 import 'package:auren_connect/core/widgets/studio_page.dart';
 import 'package:auren_connect/core/widgets/studio_pill.dart';
-import 'package:flutter/material.dart';
-import 'package:remixicon/remixicon.dart';
 
-class _Msg {
-  const _Msg(this.text, this.from, this.time);
-  final String text;
-  final int from; // 0 customer, 1 automation, 2 agent
-  final String time;
-}
+import '../../controller/inbox_controller.dart';
+import '../../data/models/inbox_conversation_model.dart';
+import '../../data/models/inbox_message_model.dart';
 
-class _Convo {
-  _Convo(
-    this.name,
-    this.handle,
-    this.channel,
-    this.preview,
-    this.time,
-    this.unread,
-    this.window,
-    this.urgent,
-    this.msgs,
-  );
-  final String name, handle, channel, preview, time, window;
-  final int unread;
-  final bool urgent;
-  final List<_Msg> msgs;
-}
-
-class InboxScreen extends StatefulWidget {
+class InboxScreen extends StatelessWidget {
   const InboxScreen({super.key});
 
   @override
-  State<InboxScreen> createState() => _InboxScreenState();
-}
-
-class _InboxScreenState extends State<InboxScreen> {
-  int _sel = 0;
-  int _tab = 0;
-  final _ctrl = TextEditingController();
-
-  final _all = [
-    _Convo(
-      'Rohan Mehta',
-      '+91 98765 43210',
-      'WhatsApp',
-      'Can I change the delivery address?',
-      '2m',
-      2,
-      '21h left',
-      false,
-      [
-        const _Msg(
-          'Hi Rohan, your order #4821 has shipped and will arrive on Friday.',
-          1,
-          '10:02',
-        ),
-        const _Msg(
-          'Great, thanks. Can I change the delivery address?',
-          0,
-          '10:05',
-        ),
-        const _Msg(
-          'Of course. Which address should we use instead?',
-          2,
-          '10:06',
-        ),
-        const _Msg('Can I change the delivery address?', 0, '10:07'),
-      ],
-    ),
-    _Convo(
-      'Priya Nair',
-      '@priya.styles',
-      'Instagram',
-      'Do you have this in size M?',
-      '14m',
-      1,
-      '23h left',
-      false,
-      [
-        const _Msg(
-          'Replied to your story: Do you have the linen shirt in size M?',
-          0,
-          '09:41',
-        ),
-        const _Msg(
-          'Thanks for your message! Let me check stock for you.',
-          1,
-          '09:41',
-        ),
-      ],
-    ),
-    _Convo(
-      'Daniel Okafor',
-      '+234 803 555 0142',
-      'WhatsApp',
-      'Thanks, coupon worked!',
-      '1h',
-      0,
-      '1h 20m left',
-      true,
-      [
-        const _Msg(
-          'Your cart is waiting. Use CART10 for 10% off today.',
-          1,
-          '08:15',
-        ),
-        const _Msg('Thanks, coupon worked!', 0, '08:52'),
-      ],
-    ),
-    _Convo(
-      'Sofia Alvarez',
-      '@sofia.alvarez',
-      'Instagram',
-      'PRICE',
-      '3h',
-      1,
-      '4h left',
-      false,
-      [
-        const _Msg('PRICE', 0, '07:20'),
-        const _Msg(
-          'Hi Sofia! Here is our price list. Tap below to see the full catalog.',
-          1,
-          '07:20',
-        ),
-        const _Msg('Can I get the wholesale rate?', 0, '07:34'),
-      ],
-    ),
-    _Convo(
-      'Kenji Watanabe',
-      '@kenji.w',
-      'Instagram',
-      'Is the webinar recorded?',
-      '5h',
-      0,
-      '1h left',
-      true,
-      [
-        const _Msg('Reminder: your webinar starts in 30 minutes.', 1, '05:30'),
-        const _Msg('Is the webinar recorded?', 0, '05:44'),
-      ],
-    ),
-  ];
-
-  List<_Convo> get _visible => _tab == 0
-      ? _all
-      : _all
-            .where((c) => c.channel == (_tab == 1 ? 'WhatsApp' : 'Instagram'))
-            .toList();
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _send(_Convo convo) {
-    final t = _ctrl.text.trim();
-    if (t.isEmpty) return;
-    setState(() {
-      convo.msgs.add(_Msg(t, 2, 'now'));
-      _ctrl.clear();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final visible = _visible;
-    final convo = visible[_sel.clamp(0, visible.length - 1)];
-    final ch = Helper.getChannel(convo.channel);
+    final controller = context.watch<InboxController>();
+
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final containerHeight = (screenHeight - 150).clamp(500.0, 900.0);
+
     return StudioPage(
       children: [
         SizedBox(
-          height: 700,
+          height: containerHeight,
+          width: double.infinity,
           child: StudioCard(
             padding: EdgeInsets.zero,
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final listW = c.maxWidth < 900 ? 250.0 : 330.0;
-                final showInfo = c.maxWidth > 1150;
-                return Row(
-                  children: [
-                    SizedBox(
-                      width: listW,
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              children: [
-                                TextField(
-                                  style: AppTextStyles.t(14),
-                                  cursorColor: AppColors.primary,
-                                  decoration: AppInputDecorations.dec(
-                                    'Search conversations',
-                                    icon: RemixIcons.search_line,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: StudioChips(
-                                    options: const [
-                                      'All',
-                                      'WhatsApp',
-                                      'Instagram',
-                                    ],
-                                    selected: _tab,
-                                    onChanged: (i) => setState(() {
-                                      _tab = i;
-                                      _sel = 0;
-                                    }),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(height: 1, color: AppColors.border),
-                          Expanded(
-                            child: ListView.builder(
-                              itemCount: visible.length,
-                              itemBuilder: (context, i) {
-                                final cv = visible[i];
-                                final active = identical(cv, convo);
-                                final cc = Helper.getChannel(cv.channel);
-                                return InkWell(
-                                  onTap: () => setState(() => _sel = i),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: active
-                                          ? AppColors.primary.withValues(
-                                              alpha: .08,
-                                            )
-                                          : null,
-                                      border: Border(
-                                        left: BorderSide(
-                                          color: active
-                                              ? AppColors.primary
-                                              : Colors.transparent,
-                                          width: 3,
-                                        ),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            StudioAvatar(cv.name, size: 42),
-                                            Positioned(
-                                              right: -3,
-                                              bottom: -3,
-                                              child: Container(
-                                                padding: const EdgeInsets.all(
-                                                  3,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.surface,
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: AppColors.border,
-                                                  ),
-                                                ),
-                                                child: Icon(
-                                                  cc.icon,
-                                                  size: 11,
-                                                  color: cc.color,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      cv.name,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: AppTextStyles.t(
-                                                        14,
-                                                        w: FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    cv.time,
-                                                    style: AppTextStyles.t(
-                                                      11.5,
-                                                      c: AppColors.textMuted,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      cv.preview,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: AppTextStyles.t(
-                                                        12.5,
-                                                        c: cv.unread > 0
-                                                            ? AppColors
-                                                                  .textPrimary
-                                                            : AppColors
-                                                                  .textSecondary,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  if (cv.unread > 0)
-                                                    Container(
-                                                      margin:
-                                                          const EdgeInsets.only(
-                                                            left: 6,
-                                                          ),
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 7,
-                                                            vertical: 2,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color:
-                                                            AppColors.primary,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              10,
-                                                            ),
-                                                      ),
-                                                      child: Text(
-                                                        '${cv.unread}',
-                                                        style: AppTextStyles.t(
-                                                          10.5,
-                                                          w: FontWeight.w800,
-                                                          c: AppColors
-                                                              .onPrimary,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(width: 1, color: AppColors.border),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 14,
-                            ),
-                            child: Row(
-                              children: [
-                                StudioAvatar(convo.name, size: 40),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        convo.name,
-                                        style: AppTextStyles.t(
-                                          15,
-                                          w: FontWeight.w700,
-                                        ),
-                                      ),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            ch.icon,
-                                            size: 13,
-                                            color: ch.color,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Flexible(
-                                            child: Text(
-                                              '${convo.channel} · ${convo.handle}',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTextStyles.t(
-                                                12,
-                                                c: AppColors.textMuted,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                StudioPill(
-                                  '24h window · ${convo.window}',
-                                  color: convo.urgent
-                                      ? AppColors.warning
-                                      : AppColors.success,
-                                  icon: RemixIcons.time_line,
-                                ),
-                                const SizedBox(width: 12),
-                                const Icon(
-                                  RemixIcons.more_2_fill,
-                                  size: 20,
-                                  color: AppColors.textMuted,
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(height: 1, color: AppColors.border),
-                          Expanded(
-                            child: ListView(
-                              reverse: true,
-                              padding: const EdgeInsets.all(20),
-                              children: [
-                                for (final m in convo.msgs.reversed) _Bubble(m),
-                              ],
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  for (final q in [
-                                    'Send price list',
-                                    'Share catalog link',
-                                    'Confirm order status',
-                                  ])
-                                    ActionChip(
-                                      label: Text(
-                                        q,
-                                        style: AppTextStyles.t(
-                                          12,
-                                          c: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                      backgroundColor: AppColors.surfaceVariant
-                                          .withValues(alpha: .6),
-                                      side: const BorderSide(
-                                        color: AppColors.border,
-                                      ),
-                                      onPressed: () =>
-                                          setState(() => _ctrl.text = q),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _ctrl,
-                                    onSubmitted: (_) => _send(convo),
-                                    style: AppTextStyles.t(14),
-                                    cursorColor: AppColors.primary,
-                                    decoration: AppInputDecorations.dec(
-                                      'Write a reply on ${convo.channel}',
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                GradientButton(
-                                  label: 'Send',
-                                  icon: RemixIcons.send_plane_2_line,
-                                  onTap: () => _send(convo),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (showInfo) ...[
-                      Container(width: 1, color: AppColors.border),
-                      SizedBox(width: 280, child: _ContactInfo(convo)),
-                    ],
-                  ],
-                );
-              },
-            ),
+            child: _buildInboxContent(context, controller),
           ),
         ),
       ],
     );
   }
+
+  Widget _buildInboxContent(BuildContext context, InboxController controller) {
+    if (controller.isLoading && controller.conversations.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (controller.errorMessage != null && controller.conversations.isEmpty) {
+      return _buildErrorState(controller);
+    }
+
+    final conversations = controller.filteredConversations;
+
+    if (conversations.isEmpty) {
+      return _buildEmptyState(controller);
+    }
+
+    final conversation = controller.selectedConversation;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final listWidth = width < 900 ? 250.0 : 330.0;
+        final showInfo = width > 1150;
+
+        return Row(
+          children: [
+            // Conversation list
+            SizedBox(
+              width: listWidth,
+              child: _buildConversationList(context, controller, conversations),
+            ),
+
+            Container(width: 1, color: AppColors.border),
+
+            // Message panel
+            Expanded(
+              child: conversation == null
+                  ? _buildSelectConversationState()
+                  : _buildMessagePanel(context, conversation),
+            ),
+
+            // Contact information
+            if (showInfo && conversation != null) ...[
+              Container(width: 1, color: AppColors.border),
+              SizedBox(width: 280, child: _ContactInfo(conversation)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  // Conversation list
+  Widget _buildConversationList(
+    BuildContext context,
+    InboxController controller,
+    List<InboxConversationModel> conversations,
+  ) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              TextField(
+                onChanged: controller.updateSearch,
+                style: AppTextStyles.t(14),
+                cursorColor: AppColors.primary,
+                decoration: AppInputDecorations.dec(
+                  'Search conversations',
+                  icon: RemixIcons.search_line,
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: StudioChips(
+                  options: const ['All', 'WhatsApp', 'Instagram'],
+                  selected: [
+                    'All',
+                    'WhatsApp',
+                    'Instagram',
+                  ].indexOf(controller.selectedChannel),
+                  onChanged: (index) {
+                    const channels = ['All', 'WhatsApp', 'Instagram'];
+
+                    controller.selectChannel(channels[index]);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        Container(height: 1, color: AppColors.border),
+
+        Expanded(
+          child: ListView.builder(
+            itemCount: conversations.length,
+            itemBuilder: (context, index) {
+              final conversation = conversations[index];
+
+              final active =
+                  conversation.id == controller.selectedConversationId;
+
+              return _ConversationTile(
+                conversation: conversation,
+                active: active,
+                onTap: () {
+                  controller.selectConversation(conversation.id);
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Message panel
+  Widget _buildMessagePanel(
+    BuildContext context,
+    InboxConversationModel conversation,
+  ) {
+    final channel = Helper.getChannel(conversation.channel);
+
+    return Column(
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              StudioAvatar(conversation.contactName, size: 40),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      conversation.contactName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.t(15, w: FontWeight.w700),
+                    ),
+
+                    Row(
+                      children: [
+                        Icon(channel.icon, size: 13, color: channel.color),
+
+                        const SizedBox(width: 5),
+
+                        Flexible(
+                          child: Text(
+                            '${conversation.channel} · ${conversation.handle}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.t(12, c: AppColors.textMuted),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              if (conversation.responseWindowExpiresAt != null)
+                StudioPill(
+                  _responseWindowLabel(conversation),
+                  color: conversation.isUrgent
+                      ? AppColors.warning
+                      : conversation.isResponseWindowExpired
+                      ? AppColors.textMuted
+                      : AppColors.success,
+                  icon: RemixIcons.time_line,
+                ),
+
+              const SizedBox(width: 12),
+
+              const Icon(
+                RemixIcons.more_2_fill,
+                size: 20,
+                color: AppColors.textMuted,
+              ),
+            ],
+          ),
+        ),
+
+        Container(height: 1, color: AppColors.border),
+
+        // Messages
+        Expanded(
+          child: conversation.messages.isEmpty
+              ? const Center(child: Text('No messages in this conversation'))
+              : ListView.builder(
+                  reverse: true,
+                  padding: const EdgeInsets.all(20),
+                  itemCount: conversation.messages.length,
+                  itemBuilder: (context, index) {
+                    final message = conversation.messages.reversed
+                        .toList()[index];
+
+                    return _InboxMessageBubble(message);
+                  },
+                ),
+        ),
+
+        // Composer placeholder until the real messaging API is connected.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  enabled: false,
+                  style: AppTextStyles.t(14),
+                  decoration: AppInputDecorations.dec(
+                    'Messaging API not connected',
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              IconButton(
+                onPressed: null,
+                icon: const Icon(RemixIcons.send_plane_2_line),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(InboxController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(RemixIcons.chat_3_line, size: 42, color: AppColors.textMuted),
+
+            const SizedBox(height: 16),
+
+            Text(
+              'No conversations found',
+              style: AppTextStyles.t(17, w: FontWeight.w700),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              controller.searchQuery.isNotEmpty ||
+                      controller.selectedChannel != 'All'
+                  ? 'Try changing your search or channel filter.'
+                  : 'Your conversations will appear here when messages are received.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.t(13, c: AppColors.textMuted),
+            ),
+
+            if (controller.searchQuery.isNotEmpty ||
+                controller.selectedChannel != 'All') ...[
+              const SizedBox(height: 16),
+
+              TextButton(
+                onPressed: controller.resetFilters,
+                child: const Text('Clear filters'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(InboxController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              RemixIcons.error_warning_line,
+              size: 40,
+              color: Colors.redAccent,
+            ),
+
+            const SizedBox(height: 12),
+
+            Text(
+              'Unable to load conversations',
+              style: AppTextStyles.t(16, w: FontWeight.w700),
+            ),
+
+            const SizedBox(height: 8),
+
+            Text(
+              controller.errorMessage ?? 'Something went wrong.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.t(12, c: AppColors.textMuted),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextButton(
+              onPressed: controller.clearError,
+              child: const Text('Dismiss'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectConversationState() {
+    return const Center(child: Text('Select a conversation'));
+  }
+
+  String _responseWindowLabel(InboxConversationModel conversation) {
+    final expiry = conversation.responseWindowExpiresAt;
+
+    if (expiry == null) return 'Window unavailable';
+
+    final remaining = expiry.difference(DateTime.now());
+
+    if (remaining.isNegative) {
+      return 'Window expired';
+    }
+
+    if (remaining.inDays > 0) {
+      return '${remaining.inDays}d ${remaining.inHours % 24}h left';
+    }
+
+    if (remaining.inHours > 0) {
+      return '${remaining.inHours}h ${remaining.inMinutes % 60}m left';
+    }
+
+    return '${remaining.inMinutes}m left';
+  }
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble(this.m);
-  final _Msg m;
+// Conversation tile
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({
+    required this.conversation,
+    required this.active,
+    required this.onTap,
+  });
+
+  final InboxConversationModel conversation;
+  final bool active;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final mine = m.from != 0;
-    final bot = m.from == 1;
+    final channel = Helper.getChannel(conversation.channel);
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primary.withValues(alpha: .08) : null,
+          border: Border(
+            left: BorderSide(
+              color: active ? AppColors.primary : Colors.transparent,
+              width: 3,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                StudioAvatar(conversation.contactName, size: 42),
+
+                Positioned(
+                  right: -3,
+                  bottom: -3,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Icon(channel.icon, size: 11, color: channel.color),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          conversation.contactName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.t(14, w: FontWeight.w600),
+                        ),
+                      ),
+
+                      if (conversation.lastMessageAt != null)
+                        Text(
+                          _formatTime(conversation.lastMessageAt!),
+                          style: AppTextStyles.t(11.5, c: AppColors.textMuted),
+                        ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          conversation.preview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.t(
+                            12.5,
+                            c: conversation.hasUnreadMessages
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+
+                      if (conversation.unreadCount > 0)
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${conversation.unreadCount}',
+                            style: AppTextStyles.t(
+                              10.5,
+                              w: FontWeight.w800,
+                              c: AppColors.onPrimary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final now = DateTime.now();
+
+    if (local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day) {
+      final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+      final minute = local.minute.toString().padLeft(2, '0');
+      final period = local.hour >= 12 ? 'PM' : 'AM';
+
+      return '$hour:$minute $period';
+    }
+
+    return '${local.day}/${local.month}/${local.year}';
+  }
+}
+
+// Message bubble
+class _InboxMessageBubble extends StatelessWidget {
+  const _InboxMessageBubble(this.message);
+
+  final InboxMessageModel message;
+
+  @override
+  Widget build(BuildContext context) {
+    final mine = message.sender != InboxMessageSender.contact;
+    final bot = message.sender == InboxMessageSender.automation;
+
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -545,7 +554,9 @@ class _Bubble extends StatelessWidget {
           gradient: mine && !bot ? AppColors.darkGradient : null,
           color: bot
               ? AppColors.paletteCyberNavy
-              : (mine ? null : AppColors.surfaceVariant),
+              : mine
+              ? null
+              : AppColors.surfaceVariant,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
@@ -567,7 +578,9 @@ class _Bubble extends StatelessWidget {
                       size: 12,
                       color: AppColors.accent,
                     ),
+
                     const SizedBox(width: 4),
+
                     Text(
                       'Automation',
                       style: AppTextStyles.t(
@@ -579,17 +592,20 @@ class _Bubble extends StatelessWidget {
                   ],
                 ),
               ),
+
             Text(
-              m.text,
+              message.text,
               style: AppTextStyles.t(
                 14,
                 c: mine && !bot ? Colors.white : AppColors.textPrimary,
                 h: 1.4,
               ),
             ),
+
             const SizedBox(height: 4),
+
             Text(
-              m.time,
+              _formatMessageTime(message.createdAt),
               style: AppTextStyles.t(
                 10.5,
                 c: mine && !bot ? Colors.white70 : AppColors.textMuted,
@@ -600,23 +616,47 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
+
+  String _formatMessageTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+
+    return '$hour:$minute $period';
+  }
 }
 
+// Contact information
 class _ContactInfo extends StatelessWidget {
-  const _ContactInfo(this.c);
-  final _Convo c;
+  const _ContactInfo(this.conversation);
 
-  Widget _row(String k, String v) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 7),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(k, style: AppTextStyles.t(12.5, c: AppColors.textMuted)),
-        ),
-        Text(v, style: AppTextStyles.t(12.5, w: FontWeight.w600)),
-      ],
-    ),
-  );
+  final InboxConversationModel conversation;
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: AppTextStyles.t(12.5, c: AppColors.textMuted),
+            ),
+          ),
+
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: AppTextStyles.t(12.5, w: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -625,44 +665,50 @@ class _ContactInfo extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(child: StudioAvatar(c.name, size: 72)),
+          Center(child: StudioAvatar(conversation.contactName, size: 72)),
+
           const SizedBox(height: 12),
-          Center(
-            child: Text(c.name, style: AppTextStyles.t(16, w: FontWeight.w700)),
-          ),
-          const SizedBox(height: 4),
+
           Center(
             child: Text(
-              c.handle,
+              conversation.contactName,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.t(16, w: FontWeight.w700),
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          Center(
+            child: Text(
+              conversation.handle,
               style: AppTextStyles.t(12, c: AppColors.textMuted),
             ),
           ),
+
           const SizedBox(height: 20),
+
           Container(height: 1, color: AppColors.border),
+
           const SizedBox(height: 10),
-          _row('Channel', c.channel),
-          _row('Orders', '7'),
-          _row('Lifetime value', '₹48,200'),
-          _row(
-            'Last automation',
-            c.channel == 'Instagram' ? 'Comment to DM' : 'Order updates',
-          ),
-          const SizedBox(height: 12),
-          Text('Tags', style: AppTextStyles.t(12.5, c: AppColors.textMuted)),
-          const SizedBox(height: 8),
-          const Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              StudioPill('Hot lead', color: AppColors.accent, dot: false),
-              StudioPill(
-                'Repeat buyer',
-                color: AppColors.secondary,
-                dot: false,
-              ),
-              StudioPill('Mumbai', color: AppColors.textSecondary, dot: false),
-            ],
-          ),
+
+          _infoRow('Channel', conversation.channel),
+
+          _infoRow('Unread messages', '${conversation.unreadCount}'),
+
+          _infoRow('Messages', '${conversation.messages.length}'),
+
+          if (conversation.lastMessageAt != null)
+            _infoRow(
+              'Last message',
+              conversation.lastMessageAt!.toLocal().toString(),
+            ),
+
+          if (conversation.responseWindowExpiresAt != null)
+            _infoRow(
+              'Response window',
+              conversation.isResponseWindowExpired ? 'Expired' : 'Active',
+            ),
         ],
       ),
     );
