@@ -37,6 +37,12 @@ class InboxController extends ChangeNotifier {
   List<InboxConversationModel> get conversations =>
       List.unmodifiable(_conversations);
 
+  int get instagramCount =>
+      _conversations.where((c) => c.isInstagram).length;
+
+  int get whatsAppCount =>
+      _conversations.where((c) => c.isWhatsApp).length;
+
   String? get selectedConversationId => _selectedConversationId;
   String get selectedChannel => _selectedChannel;
   String get statusFilter => _statusFilter;

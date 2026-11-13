@@ -133,12 +133,41 @@ class _InboxScreenState extends State<InboxScreen> {
                 style: AppTextStyles.t(13.5),
                 cursorColor: AppColors.primary,
                 decoration: AppInputDecorations.dec(
-                  'Search Instagram DMs...',
+                  'Search conversations, contacts...',
                   icon: RemixIcons.search_line,
                 ),
               ),
 
               const SizedBox(height: 10),
+
+              // Channel filter pills: All, Instagram, WhatsApp
+              Row(
+                children: [
+                  _ChannelFilterPill(
+                    label: 'All (${controller.conversations.length})',
+                    active: controller.selectedChannel == 'All',
+                    onTap: () => controller.selectChannel('All'),
+                  ),
+                  const SizedBox(width: 6),
+                  _ChannelFilterPill(
+                    label: 'Instagram (${controller.instagramCount})',
+                    icon: RemixIcons.instagram_line,
+                    color: AppColors.igColor,
+                    active: controller.selectedChannel == 'Instagram',
+                    onTap: () => controller.selectChannel('Instagram'),
+                  ),
+                  const SizedBox(width: 6),
+                  _ChannelFilterPill(
+                    label: 'WhatsApp (${controller.whatsAppCount})',
+                    icon: RemixIcons.whatsapp_line,
+                    color: AppColors.waColor,
+                    active: controller.selectedChannel == 'WhatsApp',
+                    onTap: () => controller.selectChannel('WhatsApp'),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
 
               // Filter pills: All, Unread, Archived
               Row(
@@ -328,6 +357,68 @@ class _InboxScreenState extends State<InboxScreen> {
 }
 
 // ---------------------------------------------------------
+// Channel Filter Pill
+// ---------------------------------------------------------
+class _ChannelFilterPill extends StatelessWidget {
+  const _ChannelFilterPill({
+    required this.label,
+    this.icon,
+    this.color,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData? icon;
+  final Color? color;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = color ?? AppColors.primary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+        decoration: BoxDecoration(
+          color: active
+              ? activeColor.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: active ? activeColor : AppColors.border,
+            width: active ? 1.2 : 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 12,
+                color: active ? activeColor : AppColors.textMuted,
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: AppTextStyles.t(
+                11.5,
+                w: active ? FontWeight.w600 : FontWeight.w500,
+                c: active ? activeColor : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------
 // Filter Tab Chip
 // ---------------------------------------------------------
 class _FilterTab extends StatelessWidget {
@@ -452,10 +543,14 @@ class _ConversationTile extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(
-                      RemixIcons.instagram_fill,
+                    child: Icon(
+                      conversation.isWhatsApp
+                          ? RemixIcons.whatsapp_fill
+                          : RemixIcons.instagram_fill,
                       size: 10,
-                      color: AppColors.igColor,
+                      color: conversation.isWhatsApp
+                          ? AppColors.waColor
+                          : AppColors.igColor,
                     ),
                   ),
                 ),
@@ -618,7 +713,8 @@ class _MessagePanelState extends State<_MessagePanel> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.controller.errorMessage ?? 'Failed to send message to Instagram',
+            widget.controller.errorMessage ??
+                'Failed to send message to ${widget.conversation.channel}',
           ),
           backgroundColor: AppColors.error,
         ),
@@ -645,8 +741,10 @@ class _MessagePanelState extends State<_MessagePanel> {
       uploadInput.accept = 'image/*';
     } else if (type == 'video') {
       uploadInput.accept = 'video/*';
+    } else if (type == 'file') {
+      uploadInput.accept = '.pdf,.doc,.docx,.xls,.xlsx,.txt';
     } else {
-      uploadInput.accept = 'image/*,video/*,audio/*';
+      uploadInput.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx';
     }
     uploadInput.click();
 
@@ -723,9 +821,17 @@ class _MessagePanelState extends State<_MessagePanel> {
                           const SizedBox(width: 6),
                           InkWell(
                             onTap: () {
-                              final url =
-                                  'https://instagram.com/${conversation.username}';
-                              html.window.open(url, '_blank');
+                              if (conversation.isWhatsApp) {
+                                final numOnly = conversation.phoneNumber?.replaceAll(RegExp(r'[^0-9]'), '') ??
+                                    conversation.jid?.split('@')[0] ?? '';
+                                if (numOnly.isNotEmpty) {
+                                  html.window.open('https://wa.me/$numOnly', '_blank');
+                                }
+                              } else {
+                                final url =
+                                    'https://instagram.com/${conversation.username}';
+                                html.window.open(url, '_blank');
+                              }
                             },
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -734,14 +840,18 @@ class _MessagePanelState extends State<_MessagePanel> {
                                   conversation.handle,
                                   style: AppTextStyles.t(
                                     12,
-                                    c: AppColors.primary,
+                                    c: conversation.isWhatsApp
+                                        ? AppColors.waColor
+                                        : AppColors.primary,
                                   ),
                                 ),
                                 const SizedBox(width: 3),
-                                const Icon(
+                                Icon(
                                   RemixIcons.external_link_line,
                                   size: 11,
-                                  color: AppColors.primary,
+                                  color: conversation.isWhatsApp
+                                      ? AppColors.waColor
+                                      : AppColors.primary,
                                 ),
                               ],
                             ),
@@ -752,16 +862,24 @@ class _MessagePanelState extends State<_MessagePanel> {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(
-                          RemixIcons.instagram_line,
+                        Icon(
+                          conversation.isWhatsApp
+                              ? RemixIcons.whatsapp_line
+                              : RemixIcons.instagram_line,
                           size: 12,
-                          color: AppColors.igColor,
+                          color: conversation.isWhatsApp
+                              ? AppColors.waColor
+                              : AppColors.igColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          conversation.channelUsername != null
-                              ? 'Via @${conversation.channelUsername}'
-                              : 'Instagram Direct',
+                          conversation.isWhatsApp
+                              ? (conversation.channelUsername != null
+                                  ? 'Via ${conversation.channelUsername}'
+                                  : 'WhatsApp Linked Device')
+                              : (conversation.channelUsername != null
+                                  ? 'Via @${conversation.channelUsername}'
+                                  : 'Instagram Direct'),
                           style: AppTextStyles.t(11.5, c: AppColors.textMuted),
                         ),
                       ],
@@ -772,8 +890,14 @@ class _MessagePanelState extends State<_MessagePanel> {
 
               const SizedBox(width: 8),
 
-              // 24-hr Response window pill
-              if (conversation.responseWindowExpiresAt != null)
+              // 24-hr Response window pill (for Instagram) or 24/7 Active (for WhatsApp)
+              if (conversation.isWhatsApp)
+                const StudioPill(
+                  '24/7 Active',
+                  color: AppColors.waColor,
+                  icon: RemixIcons.checkbox_circle_line,
+                )
+              else if (conversation.responseWindowExpiresAt != null)
                 StudioPill(
                   _responseWindowLabel(conversation),
                   color: conversation.isUrgent
@@ -969,6 +1093,20 @@ class _MessagePanelState extends State<_MessagePanel> {
                       ],
                     ),
                   ),
+                  const PopupMenuItem(
+                    value: 'file',
+                    child: Row(
+                      children: [
+                        Icon(
+                          RemixIcons.file_text_line,
+                          size: 18,
+                          color: AppColors.accent,
+                        ),
+                        SizedBox(width: 10),
+                        Text('Send Document / File'),
+                      ],
+                    ),
+                  ),
                 ],
               ),
 
@@ -986,7 +1124,9 @@ class _MessagePanelState extends State<_MessagePanel> {
                   onSubmitted: (_) => _sendMessage(),
                   decoration:
                       AppInputDecorations.dec(
-                        'Write an Instagram reply... (Enter to send)',
+                        widget.conversation.isWhatsApp
+                            ? 'Type a WhatsApp reply... (Enter to send)'
+                            : 'Write an Instagram reply... (Enter to send)',
                       ).copyWith(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -1725,8 +1865,31 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
 
           const SizedBox(height: 12),
 
-          // External Instagram link button
-          if (conv.username != null && conv.username!.isNotEmpty)
+          // External Profile or WhatsApp link button
+          if (conv.isWhatsApp)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.waColor),
+                  foregroundColor: AppColors.waColor,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  final numOnly = conv.phoneNumber?.replaceAll(RegExp(r'[^0-9]'), '') ??
+                      conv.jid?.split('@')[0] ?? '';
+                  if (numOnly.isNotEmpty) {
+                    html.window.open('https://wa.me/$numOnly', '_blank');
+                  }
+                },
+                icon: const Icon(RemixIcons.whatsapp_line, size: 16),
+                label: const Text('Open WhatsApp Chat'),
+              ),
+            )
+          else if (conv.username != null && conv.username!.isNotEmpty)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -1753,10 +1916,16 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
 
           // Conversation Meta
           _infoRow('Channel', conv.channel),
-          _infoRow('Unread DMs', '${widget.controller.selectedConversationId == conv.id ? 0 : conv.unreadCount}'),
+          _infoRow(
+            conv.isWhatsApp ? 'Unread Messages' : 'Unread DMs',
+            '${widget.controller.selectedConversationId == conv.id ? 0 : conv.unreadCount}',
+          ),
           _infoRow('Total Messages', '${conv.messagesCount}'),
           if (conv.channelUsername != null)
-            _infoRow('Target Page', '@${conv.channelUsername}'),
+            _infoRow(
+              conv.isWhatsApp ? 'WhatsApp Channel' : 'Target Page',
+              conv.isWhatsApp ? conv.channelUsername! : '@${conv.channelUsername}',
+            ),
           if (conv.lastMessageAt != null)
             _infoRow(
               'Last Active',

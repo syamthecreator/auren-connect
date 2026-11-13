@@ -2,15 +2,17 @@ enum InboxMessageSender { contact, automation, agent }
 
 class InboxMessageModel {
   final String id;
+  final String channelType; // 'INSTAGRAM' or 'WHATSAPP'
   final String channelId;
   final String contactId;
   final String direction; // 'INBOUND' or 'OUTBOUND'
-  final String messageType; // TEXT, IMAGE, VIDEO, AUDIO, VOICE, FILE, SHARE, STORY_REPLY, STORY_MENTION, QUICK_REPLY, COMMENT
+  final String messageType; // TEXT, IMAGE, VIDEO, AUDIO, VOICE, FILE, DOCUMENT, SHARE, STORY_REPLY, STORY_MENTION, QUICK_REPLY, COMMENT
   final String? text;
   final String? mediaUrl;
   final String? mediaType;
   final String status; // PENDING, SENT, DELIVERED, READ, FAILED
   final String? metaMessageId;
+  final String? waMessageId;
   final String? replyToMetaMessageId;
   final Map<String, dynamic>? rawPayload;
   final DateTime? readAt;
@@ -18,6 +20,7 @@ class InboxMessageModel {
 
   const InboxMessageModel({
     required this.id,
+    this.channelType = 'INSTAGRAM',
     this.channelId = '',
     this.contactId = '',
     this.direction = 'INBOUND',
@@ -27,11 +30,15 @@ class InboxMessageModel {
     this.mediaType,
     this.status = 'DELIVERED',
     this.metaMessageId,
+    this.waMessageId,
     this.replyToMetaMessageId,
     this.rawPayload,
     this.readAt,
     required this.sentAt,
   });
+
+  bool get isWhatsApp => channelType.toUpperCase() == 'WHATSAPP';
+  bool get isInstagram => !isWhatsApp;
 
   // Backward compatibility getters
   String get conversationId => contactId;
@@ -49,6 +56,12 @@ class InboxMessageModel {
   bool get isImage => messageType == 'IMAGE' || mediaType == 'image';
 
   bool get isVideo => messageType == 'VIDEO' || mediaType == 'video';
+
+  bool get isDocument =>
+      messageType == 'DOCUMENT' ||
+      messageType == 'FILE' ||
+      mediaType == 'document' ||
+      mediaType == 'file';
 
   bool get isStoryReply => messageType == 'STORY_REPLY';
 
@@ -72,6 +85,7 @@ class InboxMessageModel {
     if (isAudio) return '🎤 Voice note';
     if (isImage) return '📷 Photo';
     if (isVideo) return '🎥 Video';
+    if (isDocument) return '📄 Document';
     if (isStoryReply) return '💬 Replied to your story';
     if (isStoryMention) return '✨ Mentioned you in a story';
     return 'Message';
@@ -87,8 +101,12 @@ class InboxMessageModel {
     final directionStr = json['direction']?.toString() ??
         (json['sender'] == 'contact' ? 'INBOUND' : 'OUTBOUND');
 
+    final metaId = json['metaMessageId']?.toString() ??
+        json['waMessageId']?.toString();
+
     return InboxMessageModel(
       id: json['id']?.toString() ?? '',
+      channelType: json['channelType']?.toString() ?? 'INSTAGRAM',
       channelId: json['channelId']?.toString() ?? '',
       contactId: json['contactId']?.toString() ??
           json['conversationId']?.toString() ??
@@ -100,7 +118,8 @@ class InboxMessageModel {
       mediaType: json['mediaType']?.toString(),
       status: json['status']?.toString() ??
           (json['isRead'] == true ? 'READ' : 'DELIVERED'),
-      metaMessageId: json['metaMessageId']?.toString(),
+      metaMessageId: metaId,
+      waMessageId: json['waMessageId']?.toString(),
       replyToMetaMessageId: json['replyToMetaMessageId']?.toString(),
       rawPayload: json['rawPayload'] is Map
           ? Map<String, dynamic>.from(json['rawPayload'] as Map)
@@ -113,6 +132,7 @@ class InboxMessageModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'channelType': channelType,
       'channelId': channelId,
       'contactId': contactId,
       'direction': direction,
@@ -122,6 +142,7 @@ class InboxMessageModel {
       'mediaType': mediaType,
       'status': status,
       'metaMessageId': metaMessageId,
+      'waMessageId': waMessageId,
       'replyToMetaMessageId': replyToMetaMessageId,
       'rawPayload': rawPayload,
       'readAt': readAt?.toIso8601String(),
@@ -136,6 +157,7 @@ class InboxMessageModel {
 
   InboxMessageModel copyWith({
     String? id,
+    String? channelType,
     String? channelId,
     String? contactId,
     String? direction,
@@ -145,6 +167,7 @@ class InboxMessageModel {
     String? mediaType,
     String? status,
     String? metaMessageId,
+    String? waMessageId,
     String? replyToMetaMessageId,
     Map<String, dynamic>? rawPayload,
     DateTime? readAt,
@@ -152,6 +175,7 @@ class InboxMessageModel {
   }) {
     return InboxMessageModel(
       id: id ?? this.id,
+      channelType: channelType ?? this.channelType,
       channelId: channelId ?? this.channelId,
       contactId: contactId ?? this.contactId,
       direction: direction ?? this.direction,
@@ -161,6 +185,7 @@ class InboxMessageModel {
       mediaType: mediaType ?? this.mediaType,
       status: status ?? this.status,
       metaMessageId: metaMessageId ?? this.metaMessageId,
+      waMessageId: waMessageId ?? this.waMessageId,
       replyToMetaMessageId: replyToMetaMessageId ?? this.replyToMetaMessageId,
       rawPayload: rawPayload ?? this.rawPayload,
       readAt: readAt ?? this.readAt,

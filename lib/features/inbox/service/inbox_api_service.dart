@@ -9,10 +9,13 @@ class InboxApiService {
   final ApiClient apiClient;
 
   /// Retrieve real-time inbox statistics (unread counts, today's messages).
-  Future<InboxStatsModel> getStats({String? channelId}) async {
+  Future<InboxStatsModel> getStats({String? channelId, String? channelType}) async {
     final queryParameters = <String, String>{};
     if (channelId != null && channelId.isNotEmpty) {
       queryParameters['channelId'] = channelId;
+    }
+    if (channelType != null && channelType.isNotEmpty && channelType != 'All') {
+      queryParameters['channelType'] = channelType.toUpperCase();
     }
 
     final endpoint = Uri(
@@ -33,8 +36,9 @@ class InboxApiService {
     return InboxStatsModel.fromJson(data);
   }
 
-  /// List conversations (Instagram contacts) with search, status, and tag filters.
+  /// List conversations (Instagram & WhatsApp contacts) with channel, search, status, and tag filters.
   Future<List<InboxConversationModel>> getConversations({
+    String? channelType,
     String? channelId,
     String? status,
     String? search,
@@ -47,6 +51,9 @@ class InboxApiService {
       'offset': offset.toString(),
     };
 
+    if (channelType != null && channelType.isNotEmpty && channelType != 'All') {
+      queryParameters['channelType'] = channelType.toUpperCase();
+    }
     if (channelId != null && channelId.isNotEmpty) {
       queryParameters['channelId'] = channelId;
     }

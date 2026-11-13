@@ -2,8 +2,11 @@ import 'inbox_message_model.dart';
 
 class InboxConversationModel {
   final String id;
+  final String channelType; // 'INSTAGRAM' or 'WHATSAPP'
   final String channelId;
   final String instagramScopedId;
+  final String? jid;
+  final String? phoneNumber;
   final String? username;
   final String? name;
   final String? profilePic;
@@ -22,8 +25,11 @@ class InboxConversationModel {
 
   const InboxConversationModel({
     required this.id,
+    this.channelType = 'INSTAGRAM',
     this.channelId = '',
     this.instagramScopedId = '',
+    this.jid,
+    this.phoneNumber,
     this.username,
     this.name,
     this.profilePic,
@@ -41,6 +47,9 @@ class InboxConversationModel {
     this.messages = const [],
   });
 
+  bool get isWhatsApp => channelType.toUpperCase() == 'WHATSAPP';
+  bool get isInstagram => !isWhatsApp;
+
   // Display helpers
   String get contactName {
     if (name != null && name!.trim().isNotEmpty) {
@@ -49,17 +58,33 @@ class InboxConversationModel {
     if (username != null && username!.trim().isNotEmpty) {
       return username!.trim();
     }
-    return 'Instagram User';
+    if (phoneNumber != null && phoneNumber!.trim().isNotEmpty) {
+      return phoneNumber!.trim();
+    }
+    return isWhatsApp ? 'WhatsApp Contact' : 'Instagram User';
   }
 
   String get handle {
+    if (isWhatsApp) {
+      if (phoneNumber != null && phoneNumber!.isNotEmpty) {
+        final clean = phoneNumber!.replaceAll(RegExp(r'[^0-9]'), '');
+        if (clean.length == 12 && clean.startsWith('91')) {
+          return '+91 ${clean.substring(2, 7)} ${clean.substring(7)}';
+        }
+        return '+$clean';
+      }
+      if (jid != null && jid!.isNotEmpty) {
+        return jid!.split('@')[0];
+      }
+      return 'WhatsApp';
+    }
     if (username != null && username!.trim().isNotEmpty) {
       return username!.startsWith('@') ? username! : '@$username';
     }
     return '@user';
   }
 
-  String get channel => 'Instagram';
+  String get channel => isWhatsApp ? 'WhatsApp' : 'Instagram';
 
   String get preview {
     if (lastMessageText != null && lastMessageText!.trim().isNotEmpty) {
@@ -77,6 +102,9 @@ class InboxConversationModel {
         case 'AUDIO':
         case 'VOICE':
           return '🎤 Voice note';
+        case 'DOCUMENT':
+        case 'FILE':
+          return '📄 Document';
         case 'STORY_REPLY':
           return '💬 Replied to your story';
         case 'STORY_MENTION':
@@ -91,8 +119,9 @@ class InboxConversationModel {
   bool get hasUnreadMessages => unreadCount > 0;
 
   /// Meta Graph API 24-hour standard customer service messaging window.
+  /// Note: WhatsApp Baileys linked device has no 24-hr restriction.
   DateTime? get responseWindowExpiresAt {
-    if (lastMessageAt == null) return null;
+    if (isWhatsApp || lastMessageAt == null) return null;
     return lastMessageAt!.add(const Duration(hours: 24));
   }
 
@@ -115,7 +144,9 @@ class InboxConversationModel {
     String? chIgUserId;
     if (json['channel'] is Map) {
       final ch = json['channel'] as Map;
-      chUsername = ch['username']?.toString();
+      chUsername = ch['username']?.toString() ??
+          ch['name']?.toString() ??
+          ch['phoneNumber']?.toString();
       chIgUserId = ch['instagramUserId']?.toString();
     }
 
@@ -137,14 +168,18 @@ class InboxConversationModel {
 
     return InboxConversationModel(
       id: json['id']?.toString() ?? '',
+      channelType: json['channelType']?.toString() ?? 'INSTAGRAM',
       channelId: json['channelId']?.toString() ?? '',
       instagramScopedId: json['instagramScopedId']?.toString() ?? '',
+      jid: json['jid']?.toString(),
+      phoneNumber: json['phoneNumber']?.toString(),
       username: json['username']?.toString() ?? json['handle']?.toString(),
       name: json['name']?.toString() ?? json['contactName']?.toString(),
       profilePic: json['profilePic']?.toString(),
       tags: parsedTags,
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
-      lastMessageText: json['lastMessageText']?.toString() ?? json['preview']?.toString(),
+      lastMessageText:
+          json['lastMessageText']?.toString() ?? json['preview']?.toString(),
       lastMessageType: json['lastMessageType']?.toString(),
       lastMessageAt: DateTime.tryParse(json['lastMessageAt']?.toString() ?? ''),
       isArchived: json['isArchived'] == true,
@@ -160,8 +195,11 @@ class InboxConversationModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'channelType': channelType,
       'channelId': channelId,
       'instagramScopedId': instagramScopedId,
+      'jid': jid,
+      'phoneNumber': phoneNumber,
       'username': username,
       'name': name,
       'profilePic': profilePic,
@@ -186,8 +224,11 @@ class InboxConversationModel {
 
   InboxConversationModel copyWith({
     String? id,
+    String? channelType,
     String? channelId,
     String? instagramScopedId,
+    String? jid,
+    String? phoneNumber,
     String? username,
     String? name,
     String? profilePic,
@@ -206,8 +247,11 @@ class InboxConversationModel {
   }) {
     return InboxConversationModel(
       id: id ?? this.id,
+      channelType: channelType ?? this.channelType,
       channelId: channelId ?? this.channelId,
       instagramScopedId: instagramScopedId ?? this.instagramScopedId,
+      jid: jid ?? this.jid,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       username: username ?? this.username,
       name: name ?? this.name,
       profilePic: profilePic ?? this.profilePic,
