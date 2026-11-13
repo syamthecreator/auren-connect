@@ -62,13 +62,14 @@ class AppSidebar extends StatelessWidget {
                         NavDestination.automations,
                         NavDestination.inbox,
                         NavDestination.channel,
-                        NavDestination.settings,
                       ])
                         _NavItem(
                           destination: destination,
                           active: destination == current,
                           compact: compact,
-                          badge: destination == NavDestination.inbox && unreadChats > 0
+                          badge:
+                              destination == NavDestination.inbox &&
+                                  unreadChats > 0
                               ? '$unreadChats'
                               : null,
                           onTap: () => onSelect(destination),

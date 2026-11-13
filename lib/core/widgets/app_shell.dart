@@ -11,7 +11,6 @@ import 'package:auren_connect/features/auth/controllers/auth_controller.dart';
 import 'package:auren_connect/features/automation/presentation/screens/automation_screen.dart';
 import 'package:auren_connect/features/channel/presentation/screens/channel_screen.dart';
 import 'package:auren_connect/features/inbox/presentation/screens/inbox_screen.dart';
-import 'package:auren_connect/features/settings/presentation/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
@@ -79,7 +78,6 @@ class _AppShellState extends State<AppShell> {
       NavDestination.automations => const AutomationsScreen(),
       NavDestination.channel => const ChannelScreen(),
       NavDestination.inbox => const InboxScreen(),
-      NavDestination.settings => const SettingsScreen(),
     };
   }
 

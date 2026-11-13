@@ -1,4 +1,7 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
+
 import 'package:flutter/foundation.dart';
 
 import '../data/models/inbox_conversation_model.dart';
@@ -33,15 +36,18 @@ class InboxController extends ChangeNotifier {
   InboxMessageModel? _replyingToMessage;
   Timer? _pollingTimer;
 
+  // UI state managed by this controller.
+  bool _isSavingNotes = false;
+  final Map<String, html.AudioElement> _audioPlayers = {};
+  final Map<String, bool> _audioPlaying = {};
+
   // Getters
   List<InboxConversationModel> get conversations =>
       List.unmodifiable(_conversations);
 
-  int get instagramCount =>
-      _conversations.where((c) => c.isInstagram).length;
+  int get instagramCount => _conversations.where((c) => c.isInstagram).length;
 
-  int get whatsAppCount =>
-      _conversations.where((c) => c.isWhatsApp).length;
+  int get whatsAppCount => _conversations.where((c) => c.isWhatsApp).length;
 
   String? get selectedConversationId => _selectedConversationId;
   String get selectedChannel => _selectedChannel;
@@ -58,6 +64,44 @@ class InboxController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   InboxMessageModel? get replyingToMessage => _replyingToMessage;
+  bool get isSavingNotes => _isSavingNotes;
+
+  bool isAudioPlaying(String url) => _audioPlaying[url] ?? false;
+
+  void toggleAudioPlayback(String url) {
+    final player = _audioPlayers.putIfAbsent(url, () {
+      final audio = html.AudioElement(url);
+      audio.onEnded.listen((_) {
+        _audioPlaying[url] = false;
+        notifyListeners();
+      });
+      audio.onError.listen((_) {
+        _audioPlaying[url] = false;
+        notifyListeners();
+      });
+      return audio;
+    });
+
+    if (_audioPlaying[url] ?? false) {
+      player.pause();
+      _audioPlaying[url] = false;
+    } else {
+      player.play();
+      _audioPlaying[url] = true;
+    }
+    notifyListeners();
+  }
+
+  Future<void> saveNotes(String contactId, String notes) async {
+    _isSavingNotes = true;
+    notifyListeners();
+    try {
+      await updateNotes(contactId, notes);
+    } finally {
+      _isSavingNotes = false;
+      notifyListeners();
+    }
+  }
 
   InboxConversationModel? get selectedConversation {
     if (_selectedConversationId == null) return null;
@@ -83,7 +127,8 @@ class InboxController extends ChangeNotifier {
   List<InboxConversationModel> get filteredConversations {
     return _conversations.where((conversation) {
       // Channel filter
-      final matchesChannel = _selectedChannel == 'All' ||
+      final matchesChannel =
+          _selectedChannel == 'All' ||
           conversation.channel.toLowerCase() == _selectedChannel.toLowerCase();
 
       // Status filter
@@ -94,13 +139,15 @@ class InboxController extends ChangeNotifier {
       };
 
       // Tag filter
-      final matchesTag = _tagFilter == null ||
+      final matchesTag =
+          _tagFilter == null ||
           _tagFilter!.isEmpty ||
           conversation.tags.contains(_tagFilter);
 
       // Search query
       final query = _searchQuery.trim().toLowerCase();
-      final matchesSearch = query.isEmpty ||
+      final matchesSearch =
+          query.isEmpty ||
           conversation.contactName.toLowerCase().contains(query) ||
           conversation.handle.toLowerCase().contains(query) ||
           conversation.preview.toLowerCase().contains(query);
@@ -124,6 +171,11 @@ class InboxController extends ChangeNotifier {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    for (final player in _audioPlayers.values) {
+      player.pause();
+    }
+    _audioPlayers.clear();
+    _audioPlaying.clear();
     super.dispose();
   }
 
@@ -175,9 +227,13 @@ class InboxController extends ChangeNotifier {
 
       // Ensure open/selected conversation has 0 unread in local state
       if (_selectedConversationId != null) {
-        final activeIdx = _conversations.indexWhere((c) => c.id == _selectedConversationId);
+        final activeIdx = _conversations.indexWhere(
+          (c) => c.id == _selectedConversationId,
+        );
         if (activeIdx != -1 && _conversations[activeIdx].unreadCount > 0) {
-          _conversations[activeIdx] = _conversations[activeIdx].copyWith(unreadCount: 0);
+          _conversations[activeIdx] = _conversations[activeIdx].copyWith(
+            unreadCount: 0,
+          );
         }
       }
 
@@ -212,7 +268,9 @@ class InboxController extends ChangeNotifier {
       // When messages are loaded for the open thread, reset unread count and refresh stats
       final convIndex = _conversations.indexWhere((c) => c.id == contactId);
       if (convIndex != -1 && _conversations[convIndex].unreadCount > 0) {
-        _conversations[convIndex] = _conversations[convIndex].copyWith(unreadCount: 0);
+        _conversations[convIndex] = _conversations[convIndex].copyWith(
+          unreadCount: 0,
+        );
         loadStats();
       }
     } catch (e) {
@@ -368,16 +426,18 @@ class InboxController extends ChangeNotifier {
     final currentPinned = _conversations[convIndex].isPinned;
     final newPinned = !currentPinned;
 
-    _conversations[convIndex] =
-        _conversations[convIndex].copyWith(isPinned: newPinned);
+    _conversations[convIndex] = _conversations[convIndex].copyWith(
+      isPinned: newPinned,
+    );
     _sortConversations();
     notifyListeners();
 
     try {
       await api.updateConversation(contactId, isPinned: newPinned);
     } catch (e) {
-      _conversations[convIndex] =
-          _conversations[convIndex].copyWith(isPinned: currentPinned);
+      _conversations[convIndex] = _conversations[convIndex].copyWith(
+        isPinned: currentPinned,
+      );
       _sortConversations();
       notifyListeners();
     }
@@ -394,16 +454,18 @@ class InboxController extends ChangeNotifier {
     final currentArchived = _conversations[convIndex].isArchived;
     final newArchived = !currentArchived;
 
-    _conversations[convIndex] =
-        _conversations[convIndex].copyWith(isArchived: newArchived);
+    _conversations[convIndex] = _conversations[convIndex].copyWith(
+      isArchived: newArchived,
+    );
     notifyListeners();
 
     try {
       await api.updateConversation(contactId, isArchived: newArchived);
       loadConversations();
     } catch (e) {
-      _conversations[convIndex] =
-          _conversations[convIndex].copyWith(isArchived: currentArchived);
+      _conversations[convIndex] = _conversations[convIndex].copyWith(
+        isArchived: currentArchived,
+      );
       notifyListeners();
     }
   }
@@ -415,8 +477,9 @@ class InboxController extends ChangeNotifier {
 
     final convIndex = _conversations.indexWhere((c) => c.id == contactId);
     if (convIndex != -1) {
-      _conversations[convIndex] =
-          _conversations[convIndex].copyWith(notes: notes);
+      _conversations[convIndex] = _conversations[convIndex].copyWith(
+        notes: notes,
+      );
       notifyListeners();
     }
 
@@ -439,8 +502,9 @@ class InboxController extends ChangeNotifier {
     if (currentTags.contains(tag)) return;
 
     currentTags.add(tag);
-    _conversations[convIndex] =
-        _conversations[convIndex].copyWith(tags: currentTags);
+    _conversations[convIndex] = _conversations[convIndex].copyWith(
+      tags: currentTags,
+    );
     notifyListeners();
 
     try {
@@ -460,8 +524,9 @@ class InboxController extends ChangeNotifier {
 
     final currentTags = List<String>.from(_conversations[convIndex].tags);
     currentTags.remove(tag);
-    _conversations[convIndex] =
-        _conversations[convIndex].copyWith(tags: currentTags);
+    _conversations[convIndex] = _conversations[convIndex].copyWith(
+      tags: currentTags,
+    );
     notifyListeners();
 
     try {

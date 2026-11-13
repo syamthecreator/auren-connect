@@ -581,9 +581,7 @@ class _ConversationTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.t(
                             13.5,
-                            w: showUnread
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                            w: showUnread ? FontWeight.w700 : FontWeight.w600,
                             c: AppColors.textPrimary,
                           ),
                         ),
@@ -613,9 +611,7 @@ class _ConversationTile extends StatelessWidget {
                             c: showUnread
                                 ? AppColors.textPrimary
                                 : AppColors.textSecondary,
-                            w: showUnread
-                                ? FontWeight.w600
-                                : FontWeight.normal,
+                            w: showUnread ? FontWeight.w600 : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -770,7 +766,8 @@ class _MessagePanelState extends State<_MessagePanel> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    widget.controller.errorMessage ?? 'Failed to upload and send media',
+                    widget.controller.errorMessage ??
+                        'Failed to upload and send media',
                   ),
                   backgroundColor: AppColors.error,
                 ),
@@ -822,10 +819,18 @@ class _MessagePanelState extends State<_MessagePanel> {
                           InkWell(
                             onTap: () {
                               if (conversation.isWhatsApp) {
-                                final numOnly = conversation.phoneNumber?.replaceAll(RegExp(r'[^0-9]'), '') ??
-                                    conversation.jid?.split('@')[0] ?? '';
+                                final numOnly =
+                                    conversation.phoneNumber?.replaceAll(
+                                      RegExp(r'[^0-9]'),
+                                      '',
+                                    ) ??
+                                    conversation.jid?.split('@')[0] ??
+                                    '';
                                 if (numOnly.isNotEmpty) {
-                                  html.window.open('https://wa.me/$numOnly', '_blank');
+                                  html.window.open(
+                                    'https://wa.me/$numOnly',
+                                    '_blank',
+                                  );
                                 }
                               } else {
                                 final url =
@@ -875,11 +880,11 @@ class _MessagePanelState extends State<_MessagePanel> {
                         Text(
                           conversation.isWhatsApp
                               ? (conversation.channelUsername != null
-                                  ? 'Via ${conversation.channelUsername}'
-                                  : 'WhatsApp Linked Device')
+                                    ? 'Via ${conversation.channelUsername}'
+                                    : 'WhatsApp Linked Device')
                               : (conversation.channelUsername != null
-                                  ? 'Via @${conversation.channelUsername}'
-                                  : 'Instagram Direct'),
+                                    ? 'Via @${conversation.channelUsername}'
+                                    : 'Instagram Direct'),
                           style: AppTextStyles.t(11.5, c: AppColors.textMuted),
                         ),
                       ],
@@ -997,6 +1002,7 @@ class _MessagePanelState extends State<_MessagePanel> {
                     final message = messages.reversed.toList()[index];
                     return _MessageBubble(
                       message: message,
+                      controller: widget.controller,
                       onReply: () => widget.controller.setReplyingTo(message),
                     );
                   },
@@ -1242,9 +1248,14 @@ class _ReplyingToBanner extends StatelessWidget {
 // Message Bubble Widget
 // ---------------------------------------------------------
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.onReply});
+  const _MessageBubble({
+    required this.message,
+    required this.controller,
+    required this.onReply,
+  });
 
   final InboxMessageModel message;
+  final InboxController controller;
   final VoidCallback onReply;
 
   @override
@@ -1339,7 +1350,7 @@ class _MessageBubble extends StatelessWidget {
 
                   // Media content renderer
                   if (message.mediaUrl != null && message.mediaUrl!.isNotEmpty)
-                    _MediaRenderer(message: message),
+                    _MediaRenderer(message: message, controller: controller),
 
                   // Text content
                   if (message.text != null && message.text!.isNotEmpty)
@@ -1418,9 +1429,10 @@ class _MessageBubble extends StatelessWidget {
 // Media Renderer for Images, Videos, Voice notes
 // ---------------------------------------------------------
 class _MediaRenderer extends StatelessWidget {
-  const _MediaRenderer({required this.message});
+  const _MediaRenderer({required this.message, required this.controller});
 
   final InboxMessageModel message;
+  final InboxController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -1534,7 +1546,7 @@ class _MediaRenderer extends StatelessWidget {
 
     // Audio / Voice note
     if (message.isAudio) {
-      return _AudioMessagePlayer(url: url);
+      return _AudioMessagePlayer(url: url, controller: controller);
     }
 
     // Fallback file attachment
@@ -1574,47 +1586,18 @@ class _MediaRenderer extends StatelessWidget {
 // ---------------------------------------------------------
 // Inline Audio Voice Note Player for Flutter Web
 // ---------------------------------------------------------
-class _AudioMessagePlayer extends StatefulWidget {
-  const _AudioMessagePlayer({required this.url});
+class _AudioMessagePlayer extends StatelessWidget {
+  const _AudioMessagePlayer({required this.url, required this.controller});
 
   final String url;
-
-  @override
-  State<_AudioMessagePlayer> createState() => _AudioMessagePlayerState();
-}
-
-class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
-  html.AudioElement? _audio;
-  bool _isPlaying = false;
-
-  @override
-  void dispose() {
-    _audio?.pause();
-    super.dispose();
-  }
-
-  void _togglePlay() {
-    if (_audio == null) {
-      _audio = html.AudioElement(widget.url);
-      _audio!.onEnded.listen((_) {
-        if (mounted) setState(() => _isPlaying = false);
-      });
-      _audio!.onError.listen((_) {
-        if (mounted) setState(() => _isPlaying = false);
-      });
-    }
-
-    if (_isPlaying) {
-      _audio?.pause();
-      setState(() => _isPlaying = false);
-    } else {
-      _audio?.play();
-      setState(() => _isPlaying = true);
-    }
-  }
+  final InboxController controller;
 
   @override
   Widget build(BuildContext context) {
+    final isPlaying = context.select<InboxController, bool>(
+      (value) => value.isAudioPlaying(url),
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1632,10 +1615,10 @@ class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
               padding: const EdgeInsets.all(8),
             ),
             icon: Icon(
-              _isPlaying ? RemixIcons.pause_fill : RemixIcons.play_fill,
+              isPlaying ? RemixIcons.pause_fill : RemixIcons.play_fill,
               size: 16,
             ),
-            onPressed: _togglePlay,
+            onPressed: () => controller.toggleAudioPlayback(url),
           ),
           const SizedBox(width: 10),
           const Icon(
@@ -1649,7 +1632,7 @@ class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
           IconButton(
             icon: const Icon(RemixIcons.external_link_line, size: 14),
             color: AppColors.textMuted,
-            onPressed: () => html.window.open(widget.url, '_blank'),
+            onPressed: () => html.window.open(url, '_blank'),
           ),
         ],
       ),
@@ -1718,7 +1701,6 @@ class _ContactDetailsSidebar extends StatefulWidget {
 class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
   late TextEditingController _notesController;
   final TextEditingController _tagInputController = TextEditingController();
-  bool _isSavingNotes = false;
 
   @override
   void initState() {
@@ -1745,13 +1727,11 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
   }
 
   Future<void> _saveNotes() async {
-    setState(() => _isSavingNotes = true);
-    await widget.controller.updateNotes(
+    await widget.controller.saveNotes(
       widget.conversation.id,
       _notesController.text.trim(),
     );
     if (mounted) {
-      setState(() => _isSavingNotes = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Staff notes saved successfully!'),
@@ -1879,8 +1859,10 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
                   ),
                 ),
                 onPressed: () {
-                  final numOnly = conv.phoneNumber?.replaceAll(RegExp(r'[^0-9]'), '') ??
-                      conv.jid?.split('@')[0] ?? '';
+                  final numOnly =
+                      conv.phoneNumber?.replaceAll(RegExp(r'[^0-9]'), '') ??
+                      conv.jid?.split('@')[0] ??
+                      '';
                   if (numOnly.isNotEmpty) {
                     html.window.open('https://wa.me/$numOnly', '_blank');
                   }
@@ -1924,7 +1906,9 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
           if (conv.channelUsername != null)
             _infoRow(
               conv.isWhatsApp ? 'WhatsApp Channel' : 'Target Page',
-              conv.isWhatsApp ? conv.channelUsername! : '@${conv.channelUsername}',
+              conv.isWhatsApp
+                  ? conv.channelUsername!
+                  : '@${conv.channelUsername}',
             ),
           if (conv.lastMessageAt != null)
             _infoRow(
@@ -2021,8 +2005,8 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
                   vertical: 8,
                 ),
               ),
-              onPressed: _isSavingNotes ? null : _saveNotes,
-              icon: _isSavingNotes
+              onPressed: widget.controller.isSavingNotes ? null : _saveNotes,
+              icon: widget.controller.isSavingNotes
                   ? const SizedBox(
                       width: 12,
                       height: 12,
