@@ -56,17 +56,17 @@ class ChannelController extends ChangeNotifier {
       List.unmodifiable(_whatsAppAccounts);
 
   bool get isWhatsAppConnected =>
-      _whatsAppAccounts.any((c) => c.status == 'CONNECTED');
+      _whatsAppAccounts.any((c) => c.isConnected);
 
   WhatsAppChannelModel? get primaryWhatsAppAccount {
-    final connected = _whatsAppAccounts.where((c) => c.status == 'CONNECTED');
+    final connected = _whatsAppAccounts.where((c) => c.isConnected);
     if (connected.isNotEmpty) return connected.first;
     return _whatsAppAccounts.isNotEmpty ? _whatsAppAccounts.first : null;
   }
 
   int get totalConnectedChannels =>
       _instagramAccounts.length +
-      _whatsAppAccounts.where((c) => c.status == 'CONNECTED').length;
+      _whatsAppAccounts.where((c) => c.isConnected).length;
 
   int get selectedFilter => _selectedFilter;
 

@@ -23,7 +23,7 @@ class WhatsAppChannelModel {
   final DateTime? createdAt;
   final bool isSocketActive;
 
-  bool get isConnected => status == 'CONNECTED';
+  bool get isConnected => status == 'CONNECTED' && isSocketActive;
 
   String get displayPhoneNumber {
     if (phoneNumber != null && phoneNumber!.isNotEmpty) {
