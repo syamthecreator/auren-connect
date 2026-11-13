@@ -7,11 +7,13 @@ import 'api_constants.dart';
 import 'auth_token_manager.dart';
 
 class ApiClient {
-  ApiClient({required this._tokenManager, http.Client? client})
+  ApiClient({required this.tokenManager, http.Client? client})
     : _client = client ?? http.Client();
 
-  final AuthTokenManager _tokenManager;
+  final AuthTokenManager tokenManager;
   final http.Client _client;
+
+  Completer<bool>? _refreshCompleter;
 
   Future<Map<String, dynamic>> get(
     String endpoint, {
@@ -51,11 +53,75 @@ class ApiClient {
     return _request('DELETE', endpoint, requiresAuth: requiresAuth);
   }
 
+  /// Silently refresh the access token using the stored refresh token.
+  /// Uses a mutex completer to avoid multiple concurrent refresh calls.
+  Future<bool> _refreshToken() async {
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+
+    final completer = Completer<bool>();
+    _refreshCompleter = completer;
+
+    try {
+      final refreshToken = await tokenManager.getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        await tokenManager.clearTokens();
+        completer.complete(false);
+        return false;
+      }
+
+      final uri = Uri.parse('${ApiConstants.baseUrl}${ApiConstants.refresh}');
+      final response = await _client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(ApiConstants.receiveTimeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = response.body.isEmpty ? {} : jsonDecode(response.body);
+        if (decoded is Map && decoded['data'] is Map) {
+          final data = Map<String, dynamic>.from(decoded['data'] as Map);
+          final newAccessToken = data['accessToken'] as String?;
+          final newRefreshToken = data['refreshToken'] as String?;
+
+          if (newAccessToken != null &&
+              newAccessToken.isNotEmpty &&
+              newRefreshToken != null &&
+              newRefreshToken.isNotEmpty) {
+            await tokenManager.saveTokens(
+              accessToken: newAccessToken,
+              refreshToken: newRefreshToken,
+            );
+            completer.complete(true);
+            return true;
+          }
+        }
+      }
+
+      // Refresh failed (e.g. token expired or revoked)
+      await tokenManager.clearTokens();
+      completer.complete(false);
+      return false;
+    } catch (_) {
+      completer.complete(false);
+      return false;
+    } finally {
+      _refreshCompleter = null;
+    }
+  }
+
   Future<Map<String, dynamic>> _request(
     String method,
     String endpoint, {
     Map<String, dynamic>? body,
     bool requiresAuth = false,
+    bool isRetry = false,
   }) async {
     try {
       final uri = Uri.parse('${ApiConstants.baseUrl}$endpoint');
@@ -66,7 +132,15 @@ class ApiClient {
       };
 
       if (requiresAuth) {
-        final token = await _tokenManager.getAccessToken();
+        var token = await tokenManager.getAccessToken();
+
+        // If access token is absent but refresh token exists, attempt refresh first
+        if ((token == null || token.isEmpty) && !isRetry) {
+          final refreshed = await _refreshToken();
+          if (refreshed) {
+            token = await tokenManager.getAccessToken();
+          }
+        }
 
         if (token == null || token.isEmpty) {
           throw ApiException(
@@ -115,6 +189,26 @@ class ApiClient {
 
         default:
           throw ApiException(message: 'Unsupported HTTP method: $method');
+      }
+
+      // Intercept 401 Unauthorized on authenticated requests to transparently refresh
+      if (response.statusCode == 401 &&
+          requiresAuth &&
+          !isRetry &&
+          endpoint != ApiConstants.refresh &&
+          endpoint != ApiConstants.login &&
+          endpoint != ApiConstants.register) {
+        final refreshed = await _refreshToken();
+        if (refreshed) {
+          // Retry the request with the refreshed token
+          return await _request(
+            method,
+            endpoint,
+            body: body,
+            requiresAuth: requiresAuth,
+            isRetry: true,
+          );
+        }
       }
 
       final responseBody = response.body.isEmpty

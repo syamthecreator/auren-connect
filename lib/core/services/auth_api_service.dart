@@ -52,6 +52,11 @@ class AuthApiService {
     return _tokenManager.hasAccessToken();
   }
 
+  /// Check whether a valid session (access token or refresh token) exists.
+  Future<bool> hasValidSession() {
+    return _tokenManager.hasValidSession();
+  }
+
   /// Retrieve the authenticated user's profile.
   Future<Map<String, dynamic>> getProfile() async {
     final response = await _apiClient.get(ApiConstants.me, requiresAuth: true);

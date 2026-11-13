@@ -38,11 +38,11 @@ class AuthController extends ChangeNotifier {
 
   Future<void> initialize() async {
     try {
-      final hasToken = await _authApiService.hasAccessToken();
+      final hasSession = await _authApiService.hasValidSession();
 
-      debugPrint('AUTH INIT: Has access token = $hasToken');
+      debugPrint('AUTH INIT: Has session = $hasSession');
 
-      if (!hasToken) {
+      if (!hasSession) {
         _model = const AuthModel();
         notifyListeners();
         return;

@@ -29,6 +29,13 @@ class AuthTokenManager {
     return token != null && token.isNotEmpty;
   }
 
+  Future<bool> hasValidSession() async {
+    final token = await getAccessToken();
+    if (token != null && token.isNotEmpty) return true;
+    final refresh = await getRefreshToken();
+    return refresh != null && refresh.isNotEmpty;
+  }
+
   Future<void> clearTokens() async {
     final preferences = await SharedPreferences.getInstance();
 
