@@ -265,6 +265,17 @@ class InboxController extends ChangeNotifier {
         }
       }
 
+      // If any WhatsApp contact is missing a profile picture, trigger background avatar sync
+      final hasMissingWaAvatar = _conversations.any(
+        (c) => c.isWhatsApp && (c.profilePic == null || c.profilePic!.isEmpty),
+      );
+      if (hasMissingWaAvatar && !silent) {
+        api.syncWhatsAppAvatars().then((_) {
+          // Silent refresh if avatars were updated
+          loadConversations(silent: true);
+        }).catchError((_) {});
+      }
+
       _errorMessage = null;
     } catch (e) {
       if (!silent) {

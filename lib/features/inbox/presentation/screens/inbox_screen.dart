@@ -8,7 +8,6 @@ import 'package:remixicon/remixicon.dart';
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/app/theme/app_input_decorations.dart';
 import 'package:auren_connect/app/theme/app_text_styles.dart';
-import 'package:auren_connect/core/widgets/studio_avatar.dart';
 import 'package:auren_connect/core/widgets/studio_card.dart';
 import 'package:auren_connect/core/widgets/studio_page.dart';
 import 'package:auren_connect/core/widgets/studio_pill.dart';
@@ -540,6 +539,7 @@ class _ConversationTile extends StatelessWidget {
                   name: conversation.contactName,
                   profilePic: conversation.profilePic,
                   size: 42,
+                  isWhatsApp: conversation.isWhatsApp,
                 ),
                 Positioned(
                   right: -2,
@@ -803,6 +803,7 @@ class _MessagePanelState extends State<_MessagePanel> {
                 name: conversation.contactName,
                 profilePic: conversation.profilePic,
                 size: 38,
+                isWhatsApp: conversation.isWhatsApp,
               ),
 
               const SizedBox(width: 12),
@@ -1833,6 +1834,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
               name: conv.contactName,
               profilePic: conv.profilePic,
               size: 68,
+              isWhatsApp: conv.isWhatsApp,
             ),
           ),
           const SizedBox(height: 10),
@@ -2053,14 +2055,20 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
 }
 
 // ---------------------------------------------------------
-// Contact Avatar with network photo support
+// Contact Avatar with network photo support & sleek silhouette fallback
 // ---------------------------------------------------------
 class _ContactAvatar extends StatelessWidget {
-  const _ContactAvatar({required this.name, this.profilePic, this.size = 40});
+  const _ContactAvatar({
+    required this.name,
+    this.profilePic,
+    this.size = 40,
+    this.isWhatsApp = false,
+  });
 
   final String name;
   final String? profilePic;
   final double size;
+  final bool isWhatsApp;
 
   @override
   Widget build(BuildContext context) {
@@ -2073,10 +2081,36 @@ class _ContactAvatar extends StatelessWidget {
           height: size,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) =>
-              StudioAvatar(name, size: size),
+              _buildFallbackSilhouette(),
         ),
       );
     }
-    return StudioAvatar(name, size: size);
+    return _buildFallbackSilhouette();
+  }
+
+  Widget _buildFallbackSilhouette() {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF162032),
+        border: Border.all(
+          color: isWhatsApp
+              ? const Color(0xFF25D366).withValues(alpha: 0.35)
+              : const Color(0xFFE1306C).withValues(alpha: 0.35),
+          width: 1.2,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          RemixIcons.user_3_fill,
+          size: size * 0.52,
+          color: isWhatsApp
+              ? const Color(0xFF4ADE80).withValues(alpha: 0.85)
+              : const Color(0xFF94A3B8),
+        ),
+      ),
+    );
   }
 }

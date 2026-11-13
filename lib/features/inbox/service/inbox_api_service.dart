@@ -270,4 +270,20 @@ class InboxApiService {
     final data = response['data'] as Map<String, dynamic>? ?? {};
     return data;
   }
+
+  /// Request backend to sync contact profile pictures from active WhatsApp channels.
+  Future<int> syncWhatsAppAvatars() async {
+    try {
+      final response = await apiClient.post(
+        '/whatsapp/sync-avatars',
+        body: {},
+        requiresAuth: true,
+      );
+      if (response['success'] == true) {
+        final data = response['data'] as Map<String, dynamic>?;
+        return (data?['updatedCount'] as num?)?.toInt() ?? 0;
+      }
+    } catch (_) {}
+    return 0;
+  }
 }
