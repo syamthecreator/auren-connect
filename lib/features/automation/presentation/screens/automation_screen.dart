@@ -32,6 +32,7 @@ class _Recipe {
     required this.description,
     required this.icon,
     required this.color,
+    this.platform = 'Instagram',
     required this.build,
   });
 
@@ -39,6 +40,7 @@ class _Recipe {
   final String description;
   final IconData icon;
   final Color color;
+  final String platform;
   final Automation Function() build;
 }
 
@@ -49,8 +51,10 @@ List<_Recipe> _recipes() => [
         'Reply to a keyword comment and deliver your guide or link in DMs.',
     icon: RemixIcons.chat_3_line,
     color: AppColors.igColor,
+    platform: 'Instagram',
     build: () => Automation(
       id: _newId(),
+      channelType: 'INSTAGRAM',
       name: 'Comment-to-DM lead magnet',
       trigger: TriggerType.commentKeyword,
       keywords: ['GUIDE', 'LINK'],
@@ -74,8 +78,10 @@ List<_Recipe> _recipes() => [
         'Answer pricing DMs instantly, qualify the lead and tag the contact.',
     icon: RemixIcons.price_tag_3_line,
     color: AppColors.primary,
+    platform: 'Instagram',
     build: () => Automation(
       id: _newId(),
+      channelType: 'INSTAGRAM',
       name: 'Price & product enquiry',
       trigger: TriggerType.dmKeyword,
       keywords: ['PRICE', 'COST'],
@@ -104,8 +110,10 @@ List<_Recipe> _recipes() => [
     description: 'Thank people who tag you in their story and reward them with an offer.',
     icon: RemixIcons.at_line,
     color: AppColors.accent,
+    platform: 'Instagram',
     build: () => Automation(
       id: _newId(),
+      channelType: 'INSTAGRAM',
       name: 'Story mention thank-you',
       trigger: TriggerType.storyMention,
       steps: [
@@ -129,8 +137,10 @@ List<_Recipe> _recipes() => [
         'Turn story replies into real conversations with a follow-up question.',
     icon: RemixIcons.reply_line,
     color: AppColors.success,
+    platform: 'Instagram',
     build: () => Automation(
       id: _newId(),
+      channelType: 'INSTAGRAM',
       name: 'Story reply nurture',
       trigger: TriggerType.storyReply,
       steps: [
@@ -145,6 +155,93 @@ List<_Recipe> _recipes() => [
           type: StepType.quickReplies,
           text: 'Want to see what we have been working on?',
           options: ['Yes, show me', 'Maybe later'],
+        ),
+      ],
+    ),
+  ),
+  _Recipe(
+    title: 'WhatsApp Catalog & Price Bot',
+    description:
+        'Instantly reply to WhatsApp enquiries with full pricing, PDF catalog and booking options.',
+    icon: RemixIcons.whatsapp_line,
+    color: AppColors.waColor,
+    platform: 'WhatsApp',
+    build: () => Automation(
+      id: _newId(),
+      channelType: 'WHATSAPP',
+      name: 'WhatsApp Catalog & Price Bot',
+      trigger: TriggerType.dmKeyword,
+      keywords: ['PRICE', 'CATALOG', 'BUY', 'ORDER'],
+      steps: [
+        FlowStep(
+          id: '${_newId()}a',
+          type: StepType.sendMessage,
+          text: 'Hello {first_name}! 👋 Thanks for reaching out on WhatsApp. Here is our pricing and catalog.',
+        ),
+        FlowStep(
+          id: '${_newId()}b',
+          type: StepType.quickReplies,
+          text: 'How can we help you right now?',
+          options: ['View Price List', 'Order Products', 'Talk to Sales'],
+        ),
+        FlowStep(
+          id: '${_newId()}c',
+          type: StepType.addTag,
+          tag: 'WhatsApp Lead',
+        ),
+      ],
+    ),
+  ),
+  _Recipe(
+    title: 'WhatsApp 24/7 Welcome Flow',
+    description:
+        'Warm greeting for first-time WhatsApp messages with smart routing buttons.',
+    icon: RemixIcons.user_smile_line,
+    color: AppColors.waColor,
+    platform: 'WhatsApp',
+    build: () => Automation(
+      id: _newId(),
+      channelType: 'WHATSAPP',
+      name: 'WhatsApp 24/7 Welcome Flow',
+      trigger: TriggerType.welcomeMessage,
+      steps: [
+        FlowStep(
+          id: '${_newId()}a',
+          type: StepType.sendMessage,
+          text: 'Welcome! 🌟 Thanks for messaging our official WhatsApp support.',
+        ),
+        FlowStep(id: '${_newId()}b', type: StepType.delay, delayMinutes: 1),
+        FlowStep(
+          id: '${_newId()}c',
+          type: StepType.quickReplies,
+          text: 'Choose an option to get started immediately:',
+          options: ['Browse Services', 'Track Order', 'Live Agent'],
+        ),
+      ],
+    ),
+  ),
+  _Recipe(
+    title: 'WhatsApp After-Hours Responder',
+    description:
+        'Default fallback message when outside business hours or when no keyword matches.',
+    icon: RemixIcons.time_line,
+    color: AppColors.waColor,
+    platform: 'WhatsApp',
+    build: () => Automation(
+      id: _newId(),
+      channelType: 'WHATSAPP',
+      name: 'WhatsApp After-Hours Responder',
+      trigger: TriggerType.fallbackDefault,
+      steps: [
+        FlowStep(
+          id: '${_newId()}a',
+          type: StepType.sendMessage,
+          text: 'Thanks for your message! Our team is currently away, but we will respond as soon as we are online.',
+        ),
+        FlowStep(
+          id: '${_newId()}b',
+          type: StepType.addTag,
+          tag: 'After-hours Inquiry',
         ),
       ],
     ),
@@ -174,16 +271,33 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
     });
   }
 
-  void _openBuilder({Automation? existing, Automation? prefilled}) {
+  void _openBuilder({
+    Automation? existing,
+    Automation? prefilled,
+    String? defaultChannelType,
+  }) {
     if (existing == null && prefilled == null) {
       final channelCtrl = context.read<ChannelController>();
-      final primary = channelCtrl.primaryInstagramAccount;
-      if (primary != null) {
+      if (defaultChannelType == 'WHATSAPP') {
+        final wa = channelCtrl.primaryWhatsAppAccount;
         prefilled = Automation(
           id: _newId(),
-          channelId: primary.id,
-          channelUsername: primary.displayHandle,
+          channelType: 'WHATSAPP',
+          whatsAppChannelId: wa?.id,
+          whatsAppNumber: wa?.displayPhoneNumber,
+          trigger: TriggerType.dmKeyword,
+          steps: [FlowStep(id: _newId(), type: StepType.sendMessage)],
         );
+      } else {
+        final primary = channelCtrl.primaryInstagramAccount;
+        if (primary != null) {
+          prefilled = Automation(
+            id: _newId(),
+            channelType: 'INSTAGRAM',
+            channelId: primary.id,
+            channelUsername: primary.displayHandle,
+          );
+        }
       }
     }
     _provider.openBuilder(existing: existing, prefilled: prefilled);
@@ -193,11 +307,21 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
 
   Future<void> _saveAutomation(Automation automation) async {
     final channelCtrl = context.read<ChannelController>();
-    if (automation.channelId == null || automation.channelId!.isEmpty) {
-      final primary = channelCtrl.primaryInstagramAccount;
-      if (primary != null) {
-        automation.channelId = primary.id;
-        automation.channelUsername = primary.displayHandle;
+    if (automation.isWhatsApp) {
+      if (automation.whatsAppChannelId == null || automation.whatsAppChannelId!.isEmpty) {
+        final wa = channelCtrl.primaryWhatsAppAccount;
+        if (wa != null) {
+          automation.whatsAppChannelId = wa.id;
+          automation.whatsAppNumber = wa.displayPhoneNumber;
+        }
+      }
+    } else {
+      if (automation.channelId == null || automation.channelId!.isEmpty) {
+        final primary = channelCtrl.primaryInstagramAccount;
+        if (primary != null) {
+          automation.channelId = primary.id;
+          automation.channelUsername = primary.displayHandle;
+        }
       }
     }
 
@@ -208,7 +332,9 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
       AppSnackBar.success(
         context,
         automation.status == AutomationStatus.active
-            ? 'Automation published and active on Instagram'
+            ? (automation.isWhatsApp
+                ? 'WhatsApp Automation published and active (Anti-Ban protected)'
+                : 'Automation published and active on Instagram')
             : 'Draft saved successfully',
       );
     } else {
@@ -543,6 +669,18 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
                     ),
                   ),
                   Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                    child: StudioChips(
+                      options: [
+                        'All channels (${provider.totalCount})',
+                        'Instagram (${provider.instagramCount})',
+                        'WhatsApp (${provider.whatsAppCount})',
+                      ],
+                      selected: provider.selectedChannelFilter,
+                      onChanged: provider.changeChannelFilter,
+                    ),
+                  ),
+                  Padding(
                     padding: const EdgeInsets.fromLTRB(22, 0, 22, 18),
                     child: StudioChips(
                       options: [
@@ -588,8 +726,11 @@ class _AutomationsScreenState extends State<AutomationsScreen> {
                 ],
               ),
             ),
-            // WhatsApp is retained as a coming-soon feature in this screen.
-            const _WhatsAppAutomationSoonCard(),
+            _WhatsAppAutomationBanner(
+              onCreateWhatsApp: () =>
+                  _openBuilder(defaultChannelType: 'WHATSAPP'),
+              onBrowseRecipes: _showRecipesDialog,
+            ),
           ],
         );
       },
@@ -653,9 +794,9 @@ class _AutomationHeroBanner extends StatelessWidget {
                     icon: RemixIcons.instagram_line,
                   ),
                   const StudioPill(
-                    'WhatsApp Soon',
+                    'WhatsApp Live',
                     color: AppColors.waColor,
-                    icon: RemixIcons.time_line,
+                    icon: RemixIcons.whatsapp_line,
                   ),
                 ],
               ),
@@ -982,6 +1123,13 @@ class _AutomationCard extends StatelessWidget {
     final a = automation;
     final isActive = a.status == AutomationStatus.active;
     final isDraft = a.status == AutomationStatus.draft;
+    final isWa = a.isWhatsApp;
+    final primaryColor = isWa ? AppColors.waColor : AppColors.igColor;
+    final channelIcon =
+        isWa ? RemixIcons.whatsapp_line : RemixIcons.instagram_line;
+    final channelLabel = isWa
+        ? 'WhatsApp · ${a.trigger.title}${a.whatsAppNumber != null && a.whatsAppNumber!.isNotEmpty ? ' · ${a.whatsAppNumber}' : ''}'
+        : 'Instagram · ${a.trigger.title}';
 
     return StudioCard(
       hoverable: true,
@@ -989,7 +1137,7 @@ class _AutomationCard extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          AppColors.igColor.withValues(alpha: .10),
+          primaryColor.withValues(alpha: .10),
           const Color(0xFF0E1726),
           const Color(0xFF070C15),
         ],
@@ -999,9 +1147,9 @@ class _AutomationCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const StudioIconBox(
-                RemixIcons.instagram_line,
-                AppColors.igColor,
+              StudioIconBox(
+                channelIcon,
+                primaryColor,
                 size: 44,
               ),
               const SizedBox(width: 14),
@@ -1024,11 +1172,19 @@ class _AutomationCard extends StatelessWidget {
                           a.status.label,
                           color: AppColors.statusColor(a.status.label),
                         ),
+                        if (isWa) ...[
+                          const SizedBox(width: 6),
+                          const StudioPill(
+                            'Anti-Ban',
+                            color: AppColors.waColor,
+                            icon: RemixIcons.shield_check_line,
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Instagram · ${a.trigger.title}',
+                      channelLabel,
                       style: AppTextStyles.t(12.5, c: AppColors.textMuted),
                     ),
                   ],
@@ -1091,7 +1247,7 @@ class _AutomationCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 8,
                   children: [
-                    _FlowNode(icon: a.trigger.icon, color: AppColors.igColor),
+                    _FlowNode(icon: a.trigger.icon, color: primaryColor),
                     ...a.steps
                         .take(5)
                         .expand(
@@ -1280,6 +1436,8 @@ class _RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWa = recipe.platform == 'WhatsApp';
+
     return StudioCard(
       hoverable: true,
       padding: const EdgeInsets.all(18),
@@ -1292,9 +1450,20 @@ class _RecipeCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  recipe.title,
-                  style: AppTextStyles.t(14.5, w: FontWeight.w700),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        recipe.title,
+                        style: AppTextStyles.t(14.5, w: FontWeight.w700),
+                      ),
+                    ),
+                    StudioPill(
+                      recipe.platform,
+                      color: isWa ? AppColors.waColor : AppColors.igColor,
+                      icon: isWa ? RemixIcons.whatsapp_line : RemixIcons.instagram_line,
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1321,14 +1490,24 @@ class _RecipeCard extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  WHATSAPP COMING SOON
+//  WHATSAPP AUTOMATION SPOTLIGHT
 // ════════════════════════════════════════════════════════════════════════════
 
-class _WhatsAppAutomationSoonCard extends StatelessWidget {
-  const _WhatsAppAutomationSoonCard();
+class _WhatsAppAutomationBanner extends StatelessWidget {
+  const _WhatsAppAutomationBanner({
+    required this.onCreateWhatsApp,
+    required this.onBrowseRecipes,
+  });
+
+  final VoidCallback onCreateWhatsApp;
+  final VoidCallback onBrowseRecipes;
 
   @override
   Widget build(BuildContext context) {
+    final channelCtrl = context.watch<ChannelController>();
+    final primaryWa = channelCtrl.primaryWhatsAppAccount;
+    final isConnected = channelCtrl.isWhatsAppConnected;
+
     return StudioCard(
       hoverable: false,
       padding: const EdgeInsets.all(26),
@@ -1336,7 +1515,7 @@ class _WhatsAppAutomationSoonCard extends StatelessWidget {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          AppColors.waColor.withValues(alpha: .07),
+          AppColors.waColor.withValues(alpha: .12),
           const Color(0xFF0E1726),
           const Color(0xFF070C15),
         ],
@@ -1357,27 +1536,33 @@ class _WhatsAppAutomationSoonCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'WhatsApp Automations',
+                      'WhatsApp Automations Studio',
                       style: AppTextStyles.t(17, w: FontWeight.w700),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Meta Cloud API · WhatsApp Business Platform',
+                      isConnected
+                          ? '${primaryWa?.displayPhoneNumber ?? "Connected"} · ${primaryWa?.name ?? "Linked Device"} · Active Session'
+                          : 'Baileys Multi-Device Protocol · 10 Golden Anti-Ban Rules',
                       style: AppTextStyles.t(12.5, c: AppColors.textMuted),
                     ),
                   ],
                 ),
               ),
-              const StudioPill(
-                'Coming Soon',
-                color: AppColors.waColor,
-                icon: RemixIcons.time_line,
+              StudioPill(
+                isConnected ? 'Active & Protected' : 'Ready to Link',
+                color: isConnected ? AppColors.waColor : AppColors.warning,
+                icon: isConnected
+                    ? RemixIcons.checkbox_circle_line
+                    : RemixIcons.link,
               ),
             ],
           ),
           const SizedBox(height: 18),
           Text(
-            'Template messages, keyword replies and broadcast flows for WhatsApp are in development for aurenConnect v2.0. Instagram automation is fully operational today.',
+            isConnected
+                ? 'Automate inbound keyword replies, send instant welcome menus to new leads, and route customer inquiries 24/7 on WhatsApp with automatic rate limiting, human typing delays, and zero Meta API fees.'
+                : 'Connect your WhatsApp phone or business number in under 15 seconds in the Channel tab to enable automated keyword flows, welcome messages, and instant auto-responders.',
             style: AppTextStyles.t(13.5, c: AppColors.textSecondary, h: 1.5),
           ),
           const SizedBox(height: 18),
@@ -1385,10 +1570,27 @@ class _WhatsAppAutomationSoonCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: const [
-              _SoonFeature(label: 'Approved templates'),
-              _SoonFeature(label: 'Keyword auto-replies'),
-              _SoonFeature(label: 'Broadcast flows'),
-              _SoonFeature(label: 'Human handover'),
+              _WaShieldPill(label: 'macOS · Chrome Identity', icon: RemixIcons.computer_line),
+              _WaShieldPill(label: 'Max 20 msgs/min Rate Shield', icon: RemixIcons.speed_up_line),
+              _WaShieldPill(label: '1.0–1.8s Natural Typing Delay', icon: RemixIcons.timer_line),
+              _WaShieldPill(label: 'Pre-flight onWhatsApp Check', icon: RemixIcons.user_search_line),
+              _WaShieldPill(label: 'Anti-Flood Sender Cooldown', icon: RemixIcons.shield_check_line),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              GradientButton(
+                label: 'Create WhatsApp flow',
+                icon: RemixIcons.add_line,
+                onTap: onCreateWhatsApp,
+              ),
+              const SizedBox(width: 12),
+              GhostButton(
+                label: 'WhatsApp recipes',
+                icon: RemixIcons.magic_line,
+                onTap: onBrowseRecipes,
+              ),
             ],
           ),
         ],
@@ -1397,30 +1599,30 @@ class _WhatsAppAutomationSoonCard extends StatelessWidget {
   }
 }
 
-class _SoonFeature extends StatelessWidget {
-  const _SoonFeature({required this.label});
+class _WaShieldPill extends StatelessWidget {
+  const _WaShieldPill({required this.label, required this.icon});
 
   final String label;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surfaceVariant.withValues(alpha: .4),
+        color: AppColors.waColor.withValues(alpha: .08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.waColor.withValues(alpha: .22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            RemixIcons.lock_line,
-            size: 13,
-            color: AppColors.textMuted,
-          ),
+          Icon(icon, size: 13.5, color: AppColors.waColor),
           const SizedBox(width: 7),
-          Text(label, style: AppTextStyles.t(12, c: AppColors.textMuted)),
+          Text(
+            label,
+            style: AppTextStyles.t(12, c: AppColors.textSecondary, w: FontWeight.w500),
+          ),
         ],
       ),
     );
@@ -1570,9 +1772,11 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
             children: [
               Expanded(child: page), // only this side scrolls
               _FixedPreviewPanel(
+                isWhatsApp: _automation.isWhatsApp,
                 trigger: _trigger,
                 keywords: _keywords,
                 steps: _steps,
+                whatsAppNumber: _automation.whatsAppNumber,
               ), // this side never scrolls
             ],
           );
@@ -1594,11 +1798,18 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
               Center(
                 child: FittedBox(
                   fit: BoxFit.contain,
-                  child: _InstagramPhone(
-                    trigger: _trigger,
-                    keywords: List.of(_keywords),
-                    steps: _steps.map((s) => s.copy()).toList(),
-                  ),
+                  child: _automation.isWhatsApp
+                      ? _WhatsAppPhone(
+                          trigger: _trigger,
+                          keywords: List.of(_keywords),
+                          steps: _steps.map((s) => s.copy()).toList(),
+                          whatsAppNumber: _automation.whatsAppNumber,
+                        )
+                      : _InstagramPhone(
+                          trigger: _trigger,
+                          keywords: List.of(_keywords),
+                          steps: _steps.map((s) => s.copy()).toList(),
+                        ),
                 ),
               ),
               Positioned(
@@ -1623,6 +1834,10 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
   // ── Section 1: Setup ───────────────────────────────────────────────────────
 
   Widget _buildSetupCard() {
+    final channelCtrl = context.watch<ChannelController>();
+    final primaryIg = channelCtrl.primaryInstagramAccount;
+    final primaryWa = channelCtrl.primaryWhatsAppAccount;
+
     return _SectionCard(
       number: 1,
       title: 'Setup',
@@ -1652,28 +1867,73 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
                 subtitle: _automation.channelUsername != null &&
                         _automation.channelUsername!.isNotEmpty
                     ? '@${_automation.channelUsername!.replaceFirst('@', '')}'
-                    : (context
-                                .watch<ChannelController>()
-                                .primaryInstagramAccount
-                                ?.displayHandle ??
-                            'Comments, DMs, stories'),
-                selected: true,
-                onTap: () {},
+                    : (primaryIg?.displayHandle ?? 'Comments, DMs, stories'),
+                selected: !_automation.isWhatsApp,
+                onTap: () {
+                  _provider.setDraftChannel(
+                    primaryIg?.id,
+                    channelUsername: primaryIg?.displayHandle,
+                  );
+                },
               ),
               _ChannelTile(
                 icon: RemixIcons.whatsapp_line,
                 color: AppColors.waColor,
                 title: 'WhatsApp',
-                subtitle: 'Templates & replies',
-                selected: false,
-                comingSoon: true,
-                onTap: () => AppSnackBar.info(
-                  context,
-                  'WhatsApp automations are coming soon',
-                ),
+                subtitle: primaryWa != null
+                    ? '${primaryWa.displayPhoneNumber} · Active'
+                    : 'Linked device protocol',
+                selected: _automation.isWhatsApp,
+                comingSoon: false,
+                onTap: () {
+                  if (!channelCtrl.isWhatsAppConnected) {
+                    AppSnackBar.info(
+                      context,
+                      'Please connect your WhatsApp channel first in the Channel tab.',
+                    );
+                    return;
+                  }
+                  _provider.setDraftWhatsAppChannel(
+                    primaryWa?.id,
+                    number: primaryWa?.displayPhoneNumber,
+                  );
+                },
               ),
             ],
           ),
+          if (_automation.isWhatsApp) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.waColor.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.waColor.withValues(alpha: .25),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    RemixIcons.shield_check_line,
+                    size: 18,
+                    color: AppColors.waColor,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '10 Anti-Ban Safeguards Active: Outbound rate limiting (20/min), natural typing delay (1.0–1.8s), onWhatsApp validation, and official macOS·Chrome fingerprint.',
+                      style: AppTextStyles.t(
+                        12,
+                        c: AppColors.textSecondary,
+                        h: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1682,10 +1942,20 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
   // ── Section 2: Trigger ─────────────────────────────────────────────────────
 
   Widget _buildTriggerCard() {
+    final availableTriggers = _automation.isWhatsApp
+        ? [
+            TriggerType.dmKeyword,
+            TriggerType.welcomeMessage,
+            TriggerType.fallbackDefault,
+          ]
+        : TriggerType.values;
+
     return _SectionCard(
       number: 2,
       title: 'Trigger',
-      subtitle: 'Choose what starts this automation.',
+      subtitle: _automation.isWhatsApp
+          ? 'Choose what starts this WhatsApp automation.'
+          : 'Choose what starts this automation.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1693,7 +1963,7 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
             minItemWidth: 240,
             maxColumns: 2,
             spacing: 12,
-            children: TriggerType.values
+            children: availableTriggers
                 .map(
                   (t) => _TriggerTile(
                     type: t,
@@ -1806,7 +2076,7 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
                 child: Center(
                   child: StudioIconBox(
                     _trigger.icon,
-                    AppColors.igColor,
+                    _automation.isWhatsApp ? AppColors.waColor : AppColors.igColor,
                     size: 34,
                   ),
                 ),
@@ -1900,7 +2170,9 @@ class _AutomationBuilderState extends State<_AutomationBuilder> {
                       runSpacing: 8,
                       children: [
                         for (final t in StepType.values)
-                          _AddStepChip(type: t, onTap: () => _addStep(t)),
+                          if (!_automation.isWhatsApp ||
+                              t != StepType.replyComment)
+                            _AddStepChip(type: t, onTap: () => _addStep(t)),
                       ],
                     ),
                   ],
@@ -2248,14 +2520,18 @@ const LinearGradient _igStoryGradient = LinearGradient(
 
 class _FixedPreviewPanel extends StatelessWidget {
   const _FixedPreviewPanel({
+    this.isWhatsApp = false,
     required this.trigger,
     required this.keywords,
     required this.steps,
+    this.whatsAppNumber,
   });
 
+  final bool isWhatsApp;
   final TriggerType trigger;
   final List<String> keywords;
   final List<FlowStep> steps;
+  final String? whatsAppNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -2272,10 +2548,10 @@ class _FixedPreviewPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 RemixIcons.smartphone_line,
                 size: 17,
-                color: AppColors.primary,
+                color: isWhatsApp ? AppColors.waColor : AppColors.primary,
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -2293,7 +2569,13 @@ class _FixedPreviewPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              const StudioPill('Instagram', color: AppColors.igColor),
+              StudioPill(
+                isWhatsApp ? 'WhatsApp' : 'Instagram',
+                color: isWhatsApp ? AppColors.waColor : AppColors.igColor,
+                icon: isWhatsApp
+                    ? RemixIcons.whatsapp_line
+                    : RemixIcons.instagram_line,
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -2301,17 +2583,26 @@ class _FixedPreviewPanel extends StatelessWidget {
             child: Center(
               child: FittedBox(
                 fit: BoxFit.contain,
-                child: _InstagramPhone(
-                  trigger: trigger,
-                  keywords: keywords,
-                  steps: steps,
-                ),
+                child: isWhatsApp
+                    ? _WhatsAppPhone(
+                        trigger: trigger,
+                        keywords: keywords,
+                        steps: steps,
+                        whatsAppNumber: whatsAppNumber,
+                      )
+                    : _InstagramPhone(
+                        trigger: trigger,
+                        keywords: keywords,
+                        steps: steps,
+                      ),
               ),
             ),
           ),
           const SizedBox(height: 10),
           Text(
-            'Sample data · {first_name} shows as "Alex"',
+            isWhatsApp
+                ? 'Sample WhatsApp chat · Anti-Ban delay & rate-limit active'
+                : 'Sample data · {first_name} shows as "Alex"',
             style: AppTextStyles.t(10.5, c: AppColors.textMuted),
           ),
         ],
@@ -2345,6 +2636,664 @@ class _ChatRow {
   final bool mine;
   final List<String> options;
   final bool mention;
+}
+
+// ── iPhone + WhatsApp Chat ────────────────────────────────────────────────────
+
+class _WhatsAppPhone extends StatefulWidget {
+  const _WhatsAppPhone({
+    required this.trigger,
+    required this.keywords,
+    required this.steps,
+    this.whatsAppNumber,
+  });
+
+  final TriggerType trigger;
+  final List<String> keywords;
+  final List<FlowStep> steps;
+  final String? whatsAppNumber;
+
+  @override
+  State<_WhatsAppPhone> createState() => _WhatsAppPhoneState();
+}
+
+class _WhatsAppPhoneState extends State<_WhatsAppPhone> {
+  static const double _screenW = 393;
+  static const double _screenH = 852;
+
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollToEnd();
+  }
+
+  @override
+  void didUpdateWidget(covariant _WhatsAppPhone oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scrollToEnd();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  String _fill(String s) => s.replaceAll('{first_name}', 'Alex');
+
+  @override
+  Widget build(BuildContext context) {
+    final sample =
+        widget.keywords.isNotEmpty ? widget.keywords.first : 'PRICE';
+    final number = widget.whatsAppNumber ?? '+91 81379 22114';
+
+    const frameW = _screenW + 2 * (8 + 4);
+    const frameH = _screenH + 2 * (8 + 4);
+
+    return SizedBox(
+      width: frameW + 8,
+      height: frameH,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Hardware buttons
+          const Positioned(left: 0, top: 150, child: _SideButton(height: 32)),
+          const Positioned(left: 0, top: 205, child: _SideButton(height: 62)),
+          const Positioned(left: 0, top: 280, child: _SideButton(height: 62)),
+          const Positioned(right: 0, top: 235, child: _SideButton(height: 98)),
+
+          // Titanium frame
+          Positioned(
+            left: 4,
+            right: 4,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(64),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF5A606B),
+                    Color(0xFF2B2F36),
+                    Color(0xFF4A505A),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: .45),
+                    blurRadius: 40,
+                    offset: const Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(60),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(52),
+                  child: Container(
+                    color: const Color(0xFF0B141A),
+                    child: Stack(
+                      children: [
+                        Column(
+                          children: [
+                            const SizedBox(height: 54), // status bar space
+                            // WhatsApp Header
+                            Container(
+                              height: 62,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF1F2C34),
+                                border: Border(
+                                  bottom: BorderSide(color: Color(0xFF182229)),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    size: 19,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF00A884),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      RemixIcons.whatsapp_fill,
+                                      size: 22,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          number,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: AppTextStyles.t(
+                                            14.5,
+                                            w: FontWeight.w700,
+                                            c: Colors.white,
+                                          ),
+                                        ),
+                                        Text(
+                                          'online',
+                                          style: AppTextStyles.t(
+                                            11.5,
+                                            c: const Color(0xFF00A884),
+                                            w: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.videocam_outlined,
+                                    size: 24,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  const Icon(
+                                    Icons.call_outlined,
+                                    size: 21,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Icon(
+                                    RemixIcons.more_2_fill,
+                                    size: 18,
+                                    color: Colors.white70,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Chat Area
+                            Expanded(
+                              child: ScrollConfiguration(
+                                behavior: ScrollConfiguration.of(context)
+                                    .copyWith(scrollbars: false),
+                                child: ListView(
+                                  controller: _scroll,
+                                  physics: const ClampingScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      14, 10, 14, 14),
+                                  children: [
+                                    // Encryption Notice
+                                    Center(
+                                      child: Container(
+                                        margin: const EdgeInsets.symmetric(
+                                            vertical: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF182229),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              RemixIcons.lock_fill,
+                                              size: 11,
+                                              color: Color(0xFFFFD279),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                'Messages are end-to-end encrypted',
+                                                textAlign: TextAlign.center,
+                                                style: AppTextStyles.t(
+                                                  10.5,
+                                                  c: const Color(0xFFFFD279),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    // Date pill
+                                    Center(
+                                      child: Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF182229),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'TODAY',
+                                          style: AppTextStyles.t(
+                                            10,
+                                            c: const Color(0xFF8696A0),
+                                            w: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    // Inbound trigger message (user)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        constraints: const BoxConstraints(
+                                            maxWidth: 270),
+                                        padding: const EdgeInsets.fromLTRB(
+                                            12, 8, 12, 6),
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF1F2C34),
+                                          borderRadius: BorderRadius.only(
+                                            topLeft: Radius.circular(0),
+                                            topRight: Radius.circular(10),
+                                            bottomLeft: Radius.circular(10),
+                                            bottomRight: Radius.circular(10),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              widget.trigger ==
+                                                      TriggerType.welcomeMessage
+                                                  ? 'Hi!'
+                                                  : (widget.trigger ==
+                                                          TriggerType
+                                                              .fallbackDefault
+                                                      ? 'Hello, I have an inquiry'
+                                                      : sample),
+                                              style: AppTextStyles.t(
+                                                13.5,
+                                                c: Colors.white,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Align(
+                                              alignment: Alignment.bottomRight,
+                                              child: Text(
+                                                '09:41',
+                                                style: AppTextStyles.t(
+                                                  10,
+                                                  c: const Color(0xFF8696A0),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    // Automated Steps
+                                    for (final step in widget.steps) ...[
+                                      if (step.type == StepType.delay)
+                                        Center(
+                                          child: Container(
+                                            margin: const EdgeInsets.symmetric(
+                                                vertical: 6),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF182229),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  RemixIcons.timer_line,
+                                                  size: 12,
+                                                  color: Color(0xFF00A884),
+                                                ),
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  'typing...',
+                                                  style: AppTextStyles.t(
+                                                    10.5,
+                                                    c: const Color(0xFF00A884),
+                                                    w: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        )
+                                      else if (step.type ==
+                                              StepType.sendMessage &&
+                                          step.text.trim().isNotEmpty)
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: Container(
+                                            margin: const EdgeInsets.only(
+                                                bottom: 8),
+                                            constraints: const BoxConstraints(
+                                                maxWidth: 280),
+                                            padding: const EdgeInsets.fromLTRB(
+                                                12, 8, 10, 6),
+                                            decoration: const BoxDecoration(
+                                              color: Color(
+                                                  0xFF005C4B), // WhatsApp dark green
+                                              borderRadius: BorderRadius.only(
+                                                topLeft: Radius.circular(10),
+                                                topRight: Radius.circular(0),
+                                                bottomLeft:
+                                                    Radius.circular(10),
+                                                bottomRight:
+                                                    Radius.circular(10),
+                                              ),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _fill(step.text),
+                                                  style: AppTextStyles.t(
+                                                    13.5,
+                                                    c: Colors.white,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.end,
+                                                  children: [
+                                                    const Spacer(),
+                                                    Text(
+                                                      '09:41',
+                                                      style: AppTextStyles.t(
+                                                        10,
+                                                        c: const Color(
+                                                            0xFF8696A0),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    const Icon(
+                                                      RemixIcons
+                                                          .check_double_line,
+                                                      size: 13,
+                                                      color: Color(0xFF53BDEB),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        )
+                                      else if (step.type ==
+                                          StepType.quickReplies) ...[
+                                        if (step.text.trim().isNotEmpty)
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Container(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 6),
+                                              constraints: const BoxConstraints(
+                                                  maxWidth: 280),
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      12, 8, 10, 6),
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFF005C4B),
+                                                borderRadius: BorderRadius.only(
+                                                  topLeft: Radius.circular(10),
+                                                  topRight: Radius.circular(0),
+                                                  bottomLeft:
+                                                      Radius.circular(10),
+                                                  bottomRight:
+                                                      Radius.circular(10),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    _fill(step.text),
+                                                    style: AppTextStyles.t(
+                                                      13.5,
+                                                      c: Colors.white,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.end,
+                                                    children: [
+                                                      const Spacer(),
+                                                      Text(
+                                                        '09:41',
+                                                        style: AppTextStyles.t(
+                                                          10,
+                                                          c: const Color(
+                                                              0xFF8696A0),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      const Icon(
+                                                        RemixIcons
+                                                            .check_double_line,
+                                                        size: 13,
+                                                        color:
+                                                            Color(0xFF53BDEB),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        for (final opt in step.options)
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Container(
+                                              margin: const EdgeInsets.only(
+                                                  bottom: 6),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 14,
+                                                vertical: 9,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF1F2C34),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: const Color(0xFF00A884)
+                                                      .withValues(alpha: .5),
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize:
+                                                    MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    RemixIcons.reply_line,
+                                                    size: 14,
+                                                    color: Color(0xFF00A884),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    opt,
+                                                    style: AppTextStyles.t(
+                                                      12.5,
+                                                      c: const Color(
+                                                          0xFF00A884),
+                                                      w: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // WhatsApp Composer
+                            Container(
+                              height: 60,
+                              color: const Color(0xFF0B141A),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      height: 44,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1F2C34),
+                                        borderRadius: BorderRadius.circular(22),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                            RemixIcons.emotion_line,
+                                            size: 20,
+                                            color: Color(0xFF8696A0),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Message',
+                                              style: AppTextStyles.t(
+                                                13.5,
+                                                c: const Color(0xFF8696A0),
+                                              ),
+                                            ),
+                                          ),
+                                          const Icon(
+                                            RemixIcons.attachment_2,
+                                            size: 18,
+                                            color: Color(0xFF8696A0),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          const Icon(
+                                            RemixIcons.camera_line,
+                                            size: 18,
+                                            color: Color(0xFF8696A0),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF00A884),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      RemixIcons.mic_line,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const _HomeIndicator(),
+                          ],
+                        ),
+                        // Status bar
+                        const Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 54,
+                          child: _IosStatusBar(),
+                        ),
+                        // Dynamic Island
+                        Positioned(
+                          top: 11,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              width: 124,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Align(
+                                alignment: const Alignment(.62, 0),
+                                child: Container(
+                                  width: 11,
+                                  height: 11,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF0B0E16),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── iPhone + Instagram DM ────────────────────────────────────────────────────

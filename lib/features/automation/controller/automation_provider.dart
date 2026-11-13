@@ -49,6 +49,16 @@ class AutomationProvider extends ChangeNotifier {
 
   int get selectedFilter => _selectedFilter;
 
+  int _selectedChannelFilter = 0; // 0: All, 1: Instagram, 2: WhatsApp
+
+  int get selectedChannelFilter => _selectedChannelFilter;
+
+  void changeChannelFilter(int index) {
+    if (index < 0 || index > 2) return;
+    _selectedChannelFilter = index;
+    notifyListeners();
+  }
+
   Automation? _builderDraft;
 
   Automation? get builderDraft => _builderDraft;
@@ -100,6 +110,12 @@ class AutomationProvider extends ChangeNotifier {
 
   int get totalCount => _items.length;
 
+  int get instagramCount =>
+      _items.where((item) => item.isInstagram).length;
+
+  int get whatsAppCount =>
+      _items.where((item) => item.isWhatsApp).length;
+
   int get activeCount => countByStatus(AutomationStatus.active);
 
   int get pausedCount => countByStatus(AutomationStatus.paused);
@@ -117,6 +133,12 @@ class AutomationProvider extends ChangeNotifier {
     final query = searchController.text.trim().toLowerCase();
 
     return _items.where((automation) {
+      final matchesChannel = switch (_selectedChannelFilter) {
+        1 => automation.isInstagram,
+        2 => automation.isWhatsApp,
+        _ => true,
+      };
+
       final matchesFilter = switch (_selectedFilter) {
         1 => automation.status == AutomationStatus.active,
         2 => automation.status == AutomationStatus.paused,
@@ -131,7 +153,7 @@ class AutomationProvider extends ChangeNotifier {
             (keyword) => keyword.toLowerCase().contains(query),
           );
 
-      return matchesFilter && matchesSearch;
+      return matchesChannel && matchesFilter && matchesSearch;
     }).toList();
   }
 
@@ -525,8 +547,11 @@ class AutomationProvider extends ChangeNotifier {
           ? 'Untitled automation'
           : draft.name.trim(),
       description: draft.description,
+      channelType: draft.channelType,
       channelId: draft.channelId,
       channelUsername: draft.channelUsername,
+      whatsAppChannelId: draft.whatsAppChannelId,
+      whatsAppNumber: draft.whatsAppNumber,
       trigger: draft.trigger,
       keywords: List<String>.of(draft.keywords),
       exactMatch: draft.exactMatch,
@@ -545,8 +570,34 @@ class AutomationProvider extends ChangeNotifier {
 
   void setDraftChannel(String? channelId, {String? channelUsername}) {
     if (_builderDraft == null) return;
+    _builderDraft!.channelType = 'INSTAGRAM';
     _builderDraft!.channelId = channelId;
     _builderDraft!.channelUsername = channelUsername;
+    _builderDraft!.whatsAppChannelId = null;
+    _builderDraft!.whatsAppNumber = null;
+    notifyListeners();
+  }
+
+  void setDraftWhatsAppChannel(String? channelId, {String? number}) {
+    if (_builderDraft == null) return;
+    _builderDraft!.channelType = 'WHATSAPP';
+    _builderDraft!.whatsAppChannelId = channelId;
+    _builderDraft!.whatsAppNumber = number;
+    _builderDraft!.channelId = null;
+    _builderDraft!.channelUsername = null;
+    // If current trigger is Instagram-specific, default to DM Keyword
+    if (_builderDraft!.trigger == TriggerType.commentKeyword ||
+        _builderDraft!.trigger == TriggerType.storyReply ||
+        _builderDraft!.trigger == TriggerType.storyMention) {
+      _builderDraft!.trigger = TriggerType.dmKeyword;
+    }
+    // Remove any Instagram-only replyComment steps
+    _builderDraft!.steps.removeWhere((s) => s.type == StepType.replyComment);
+    if (_builderDraft!.steps.isEmpty) {
+      _builderDraft!.steps.add(
+        FlowStep(id: _newId(), type: StepType.sendMessage),
+      );
+    }
     notifyListeners();
   }
 
