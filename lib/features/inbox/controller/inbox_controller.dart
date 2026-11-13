@@ -167,6 +167,14 @@ class InboxController extends ChangeNotifier {
         }
       }
 
+      // Ensure open/selected conversation has 0 unread in local state
+      if (_selectedConversationId != null) {
+        final activeIdx = _conversations.indexWhere((c) => c.id == _selectedConversationId);
+        if (activeIdx != -1 && _conversations[activeIdx].unreadCount > 0) {
+          _conversations[activeIdx] = _conversations[activeIdx].copyWith(unreadCount: 0);
+        }
+      }
+
       _errorMessage = null;
     } catch (e) {
       if (!silent) {
@@ -194,6 +202,13 @@ class InboxController extends ChangeNotifier {
     try {
       final messages = await api.getMessages(contactId);
       _messagesByContact[contactId] = messages;
+
+      // When messages are loaded for the open thread, reset unread count and refresh stats
+      final convIndex = _conversations.indexWhere((c) => c.id == contactId);
+      if (convIndex != -1 && _conversations[convIndex].unreadCount > 0) {
+        _conversations[convIndex] = _conversations[convIndex].copyWith(unreadCount: 0);
+        loadStats();
+      }
     } catch (e) {
       debugPrint('InboxController loadMessages error: $e');
     } finally {
@@ -208,9 +223,6 @@ class InboxController extends ChangeNotifier {
 
   // Select a conversation
   void selectConversation(String conversationId) {
-    if (_selectedConversationId == conversationId) return;
-
-    _selectedConversationId = conversationId;
     _replyingToMessage = null;
 
     final index = _conversations.indexWhere((c) => c.id == conversationId);
@@ -218,8 +230,12 @@ class InboxController extends ChangeNotifier {
       _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
     }
 
+    if (_selectedConversationId != conversationId) {
+      _selectedConversationId = conversationId;
+      loadMessages(conversationId);
+    }
+
     notifyListeners();
-    loadMessages(conversationId);
     sendAction(conversationId, 'mark_seen');
   }
 

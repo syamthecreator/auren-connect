@@ -1,7 +1,9 @@
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/core/constants/asset_constants.dart';
 import 'package:auren_connect/core/utils/shell_scope.dart';
+import 'package:auren_connect/features/inbox/controller/inbox_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
 
 class AppSidebar extends StatelessWidget {
@@ -25,6 +27,9 @@ class AppSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inboxController = context.watch<InboxController?>();
+    final unreadChats = inboxController?.stats.unreadConversations ?? 0;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
@@ -63,15 +68,14 @@ class AppSidebar extends StatelessWidget {
                           destination: destination,
                           active: destination == current,
                           compact: compact,
-                          badge: destination == NavDestination.inbox
-                              ? '12'
+                          badge: destination == NavDestination.inbox && unreadChats > 0
+                              ? '$unreadChats'
                               : null,
                           onTap: () => onSelect(destination),
                         ),
                     ],
                   ),
                 ),
-                if (!compact) const _UsageCard(),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     compact ? 12 : 14,
@@ -389,82 +393,5 @@ class _ActionItem extends StatelessWidget {
     }
 
     return item;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// USAGE CARD
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _UsageCard extends StatelessWidget {
-  const _UsageCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: AppColors.hydroGlassGradient,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                RemixIcons.flashlight_line,
-                size: 16,
-                color: AppColors.accent,
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Growth plan',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Text(
-                '74%',
-                style: TextStyle(
-                  color: AppColors.primary.withValues(alpha: .9),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Stack(
-              children: [
-                Container(height: 6, color: AppColors.border),
-                FractionallySizedBox(
-                  widthFactor: .74,
-                  child: Container(
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      gradient: AppColors.neonLaserGradient,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            '18,420 of 25,000 messages used',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-          ),
-        ],
-      ),
-    );
   }
 }

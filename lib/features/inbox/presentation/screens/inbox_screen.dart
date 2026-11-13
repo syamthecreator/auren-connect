@@ -43,11 +43,6 @@ class _InboxScreenState extends State<InboxScreen> {
 
     return StudioPage(
       children: [
-        // Top stats bar
-        _InboxStatsBar(controller: controller),
-
-        const SizedBox(height: 14),
-
         // Main inbox card
         SizedBox(
           height: containerHeight,
@@ -333,122 +328,6 @@ class _InboxScreenState extends State<InboxScreen> {
 }
 
 // ---------------------------------------------------------
-// Stats Bar at top of screen
-// ---------------------------------------------------------
-class _InboxStatsBar extends StatelessWidget {
-  const _InboxStatsBar({required this.controller});
-
-  final InboxController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final stats = controller.stats;
-
-    return Row(
-      children: [
-        _StatCard(
-          icon: RemixIcons.chat_3_line,
-          iconColor: AppColors.primary,
-          label: 'Conversations',
-          value: '${stats.totalConversations}',
-        ),
-        const SizedBox(width: 12),
-        _StatCard(
-          icon: RemixIcons.mail_unread_line,
-          iconColor: stats.unreadConversations > 0
-              ? AppColors.warning
-              : AppColors.success,
-          label: 'Unread Chats',
-          value: '${stats.unreadConversations}',
-          highlight: stats.unreadConversations > 0,
-        ),
-        const SizedBox(width: 12),
-        _StatCard(
-          icon: RemixIcons.message_3_line,
-          iconColor: AppColors.igColor,
-          label: "Today's Messages",
-          value: '${stats.totalMessagesToday}',
-        ),
-        const Spacer(),
-        // Real-time indicator pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: AppColors.success,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Live Instagram Sync',
-                style: AppTextStyles.t(12, w: FontWeight.w600, c: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    this.highlight = false,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-  final bool highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: highlight ? iconColor.withValues(alpha: 0.5) : AppColors.border,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: iconColor),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: AppTextStyles.t(12, c: AppColors.textMuted),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: AppTextStyles.t(13.5, w: FontWeight.w700, c: AppColors.textPrimary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------
 // Filter Tab Chip
 // ---------------------------------------------------------
 class _FilterTab extends StatelessWidget {
@@ -536,6 +415,8 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showUnread = conversation.unreadCount > 0 && !active;
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -605,7 +486,7 @@ class _ConversationTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.t(
                             13.5,
-                            w: conversation.hasUnreadMessages
+                            w: showUnread
                                 ? FontWeight.w700
                                 : FontWeight.w600,
                             c: AppColors.textPrimary,
@@ -617,7 +498,7 @@ class _ConversationTile extends StatelessWidget {
                           _formatTime(conversation.lastMessageAt!),
                           style: AppTextStyles.t(
                             11,
-                            c: conversation.hasUnreadMessages
+                            c: showUnread
                                 ? AppColors.primary
                                 : AppColors.textMuted,
                           ),
@@ -634,16 +515,16 @@ class _ConversationTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.t(
                             12,
-                            c: conversation.hasUnreadMessages
+                            c: showUnread
                                 ? AppColors.textPrimary
                                 : AppColors.textSecondary,
-                            w: conversation.hasUnreadMessages
+                            w: showUnread
                                 ? FontWeight.w600
                                 : FontWeight.normal,
                           ),
                         ),
                       ),
-                      if (conversation.unreadCount > 0)
+                      if (showUnread)
                         Container(
                           margin: const EdgeInsets.only(left: 6),
                           padding: const EdgeInsets.symmetric(
@@ -720,18 +601,29 @@ class _MessagePanelState extends State<_MessagePanel> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
-
-    widget.controller.sendMessage(
-      contactId: widget.conversation.id,
-      text: text,
-    );
 
     _textController.clear();
     _isTyping = false;
     widget.controller.sendAction(widget.conversation.id, 'typing_off');
+
+    final success = await widget.controller.sendMessage(
+      contactId: widget.conversation.id,
+      text: text,
+    );
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.controller.errorMessage ?? 'Failed to send message to Instagram',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   void _onTextChanged(String value) {
@@ -764,16 +656,28 @@ class _MessagePanelState extends State<_MessagePanel> {
         final file = files[0];
         final reader = html.FileReader();
         reader.readAsDataUrl(file);
-        reader.onLoadEnd.listen((e) {
+        reader.onLoadEnd.listen((e) async {
           final result = reader.result as String?;
           if (result != null && result.isNotEmpty) {
-            final mime = file.type.isNotEmpty ? file.type : 'application/octet-stream';
-            widget.controller.uploadAndSendMedia(
+            final mime = file.type.isNotEmpty
+                ? file.type
+                : 'application/octet-stream';
+            final success = await widget.controller.uploadAndSendMedia(
               contactId: widget.conversation.id,
               fileBase64: result,
               filename: file.name,
               mimeType: mime,
             );
+            if (!success && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    widget.controller.errorMessage ?? 'Failed to upload and send media',
+                  ),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
           }
         });
       }
@@ -894,8 +798,7 @@ class _MessagePanelState extends State<_MessagePanel> {
                       : AppColors.textMuted,
                 ),
                 tooltip: conversation.isPinned ? 'Unpin' : 'Pin conversation',
-                onPressed: () =>
-                    widget.controller.togglePin(conversation.id),
+                onPressed: () => widget.controller.togglePin(conversation.id),
               ),
 
               // Archive toggle button
@@ -970,8 +873,7 @@ class _MessagePanelState extends State<_MessagePanel> {
                     final message = messages.reversed.toList()[index];
                     return _MessageBubble(
                       message: message,
-                      onReply: () =>
-                          widget.controller.setReplyingTo(message),
+                      onReply: () => widget.controller.setReplyingTo(message),
                     );
                   },
                 ),
@@ -1029,7 +931,11 @@ class _MessagePanelState extends State<_MessagePanel> {
                     value: 'image',
                     child: Row(
                       children: [
-                        Icon(RemixIcons.image_line, size: 18, color: AppColors.primary),
+                        Icon(
+                          RemixIcons.image_line,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                         SizedBox(width: 10),
                         Text('Send Photo / Image'),
                       ],
@@ -1039,7 +945,11 @@ class _MessagePanelState extends State<_MessagePanel> {
                     value: 'video',
                     child: Row(
                       children: [
-                        Icon(RemixIcons.video_line, size: 18, color: AppColors.secondary),
+                        Icon(
+                          RemixIcons.video_line,
+                          size: 18,
+                          color: AppColors.secondary,
+                        ),
                         SizedBox(width: 10),
                         Text('Send Video Clip'),
                       ],
@@ -1049,7 +959,11 @@ class _MessagePanelState extends State<_MessagePanel> {
                     value: 'audio',
                     child: Row(
                       children: [
-                        Icon(RemixIcons.mic_line, size: 18, color: AppColors.warning),
+                        Icon(
+                          RemixIcons.mic_line,
+                          size: 18,
+                          color: AppColors.warning,
+                        ),
                         SizedBox(width: 10),
                         Text('Send Voice Note / Audio'),
                       ],
@@ -1070,14 +984,15 @@ class _MessagePanelState extends State<_MessagePanel> {
                   style: AppTextStyles.t(13.5),
                   cursorColor: AppColors.primary,
                   onSubmitted: (_) => _sendMessage(),
-                  decoration: AppInputDecorations.dec(
-                    'Write an Instagram reply... (Enter to send)',
-                  ).copyWith(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                  ),
+                  decoration:
+                      AppInputDecorations.dec(
+                        'Write an Instagram reply... (Enter to send)',
+                      ).copyWith(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                      ),
                 ),
               ),
 
@@ -1131,10 +1046,7 @@ class _MessagePanelState extends State<_MessagePanel> {
 // Quoted Reply Banner
 // ---------------------------------------------------------
 class _ReplyingToBanner extends StatelessWidget {
-  const _ReplyingToBanner({
-    required this.message,
-    required this.onCancel,
-  });
+  const _ReplyingToBanner({required this.message, required this.onCancel});
 
   final InboxMessageModel message;
   final VoidCallback onCancel;
@@ -1152,11 +1064,7 @@ class _ReplyingToBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            RemixIcons.reply_line,
-            size: 16,
-            color: AppColors.primary,
-          ),
+          const Icon(RemixIcons.reply_line, size: 16, color: AppColors.primary),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -1194,10 +1102,7 @@ class _ReplyingToBanner extends StatelessWidget {
 // Message Bubble Widget
 // ---------------------------------------------------------
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({
-    required this.message,
-    required this.onReply,
-  });
+  const _MessageBubble({required this.message, required this.onReply});
 
   final InboxMessageModel message;
   final VoidCallback onReply;
@@ -1210,8 +1115,9 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment:
-            mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: mine
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (mine)
@@ -1239,7 +1145,11 @@ class _MessageBubble extends StatelessWidget {
                   bottomLeft: Radius.circular(mine ? 16 : 4),
                   bottomRight: Radius.circular(mine ? 4 : 16),
                 ),
-                border: bot ? Border.all(color: AppColors.primary.withValues(alpha: 0.3)) : null,
+                border: bot
+                    ? Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      )
+                    : null,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1594,10 +1504,7 @@ class _AudioMessagePlayerState extends State<_AudioMessagePlayer> {
             color: AppColors.primary,
           ),
           const SizedBox(width: 8),
-          Text(
-            'Voice Note',
-            style: AppTextStyles.t(12.5, w: FontWeight.w600),
-          ),
+          Text('Voice Note', style: AppTextStyles.t(12.5, w: FontWeight.w600)),
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(RemixIcons.external_link_line, size: 14),
@@ -1626,7 +1533,9 @@ class _QuickRepliesPills extends StatelessWidget {
         spacing: 6,
         runSpacing: 6,
         children: items.map((item) {
-          final title = item is Map ? item['title']?.toString() ?? '' : item.toString();
+          final title = item is Map
+              ? item['title']?.toString() ?? ''
+              : item.toString();
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -1636,7 +1545,11 @@ class _QuickRepliesPills extends StatelessWidget {
             ),
             child: Text(
               title,
-              style: AppTextStyles.t(11.5, w: FontWeight.w600, c: AppColors.primary),
+              style: AppTextStyles.t(
+                11.5,
+                w: FontWeight.w600,
+                c: AppColors.primary,
+              ),
             ),
           );
         }).toList(),
@@ -1670,8 +1583,9 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
   @override
   void initState() {
     super.initState();
-    _notesController =
-        TextEditingController(text: widget.conversation.notes ?? '');
+    _notesController = TextEditingController(
+      text: widget.conversation.notes ?? '',
+    );
   }
 
   @override
@@ -1724,7 +1638,9 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
               controller: _tagInputController,
               autofocus: true,
               style: AppTextStyles.t(14),
-              decoration: AppInputDecorations.dec('Tag name (e.g. VIP, Lead, Sale)'),
+              decoration: AppInputDecorations.dec(
+                'Tag name (e.g. VIP, Lead, Sale)',
+              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -1837,7 +1753,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
 
           // Conversation Meta
           _infoRow('Channel', conv.channel),
-          _infoRow('Unread DMs', '${conv.unreadCount}'),
+          _infoRow('Unread DMs', '${widget.controller.selectedConversationId == conv.id ? 0 : conv.unreadCount}'),
           _infoRow('Total Messages', '${conv.messagesCount}'),
           if (conv.channelUsername != null)
             _infoRow('Target Page', '@${conv.channelUsername}'),
@@ -1855,10 +1771,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'CRM Tags',
-                style: AppTextStyles.t(13, w: FontWeight.w700),
-              ),
+              Text('CRM Tags', style: AppTextStyles.t(13, w: FontWeight.w700)),
               InkWell(
                 onTap: _showAddTagDialog,
                 child: Row(
@@ -1900,8 +1813,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
                   label: Text(tag, style: AppTextStyles.t(11.5)),
                   backgroundColor: AppColors.surfaceVariant,
                   deleteIcon: const Icon(RemixIcons.close_line, size: 12),
-                  onDeleted: () =>
-                      widget.controller.removeTag(conv.id, tag),
+                  onDeleted: () => widget.controller.removeTag(conv.id, tag),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: const BorderSide(color: AppColors.border),
@@ -1926,9 +1838,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
             style: AppTextStyles.t(12.5),
             decoration: AppInputDecorations.dec(
               'Record customer background, preferences, follow-up dates...',
-            ).copyWith(
-              contentPadding: const EdgeInsets.all(10),
-            ),
+            ).copyWith(contentPadding: const EdgeInsets.all(10)),
           ),
           const SizedBox(height: 8),
           Align(
@@ -1937,7 +1847,10 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
               ),
               onPressed: _isSavingNotes ? null : _saveNotes,
               icon: _isSavingNotes
@@ -1982,11 +1895,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
 // Contact Avatar with network photo support
 // ---------------------------------------------------------
 class _ContactAvatar extends StatelessWidget {
-  const _ContactAvatar({
-    required this.name,
-    this.profilePic,
-    this.size = 40,
-  });
+  const _ContactAvatar({required this.name, this.profilePic, this.size = 40});
 
   final String name;
   final String? profilePic;
@@ -2002,7 +1911,8 @@ class _ContactAvatar extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => StudioAvatar(name, size: size),
+          errorBuilder: (context, error, stackTrace) =>
+              StudioAvatar(name, size: size),
         ),
       );
     }
