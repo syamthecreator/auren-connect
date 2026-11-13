@@ -501,15 +501,19 @@ Base path: `/api/v1/automations`
 
 ### 💡 Core Automation Concepts
 
+#### Supported Channel Types (`channelType`)
+* `INSTAGRAM`: Standard Instagram Direct & Public Comment workflows powered by Meta Graph API v21.0.
+* `WHATSAPP`: Automated WhatsApp business messaging powered by Baileys Multi-Device protocol with the 10 Golden Anti-Ban rules.
+
 #### Trigger Types (`triggerType`)
-| Trigger | Description | Typical Use Case |
-|---|---|---|
-| `COMMENT_KEYWORD` | User comments on a Reel or Post | **Comment-to-DM:** Public comment reply + instant private DM lead magnet |
-| `DM_KEYWORD` | User sends a DM matching keyword | **DM Auto-responder:** FAQs, pricing, opening hours |
-| `STORY_REPLY` | User replies to an Instagram Story | Instant engagement response to story views |
-| `STORY_MENTION` | User mentions `@yourbrand` in their Story | Thank-you gift or discount coupon flow |
-| `WELCOME_MESSAGE` | First message from a new contact | Brand greeting & interactive menu buttons |
-| `FALLBACK_DEFAULT` | No other keyword automation matched | Default customer care / routing message |
+| Trigger | Channels | Description | Typical Use Case |
+|---|---|---|---|
+| `DM_KEYWORD` | Instagram & WhatsApp | Contact sends a DM matching keyword | **Auto-responder:** FAQs, pricing, product catalog |
+| `WELCOME_MESSAGE` | Instagram & WhatsApp | First message from a new contact | Brand greeting & interactive menu buttons |
+| `FALLBACK_DEFAULT` | Instagram & WhatsApp | No other keyword automation matched | Default customer care / routing message |
+| `COMMENT_KEYWORD` | Instagram | User comments on a Reel or Post | **Comment-to-DM:** Public comment reply + instant private DM lead magnet |
+| `STORY_REPLY` | Instagram | User replies to an Instagram Story | Instant engagement response to story views |
+| `STORY_MENTION` | Instagram | User mentions `@yourbrand` in their Story | Thank-you gift or discount coupon flow |
 
 #### Keyword Match Types (`matchType`)
 * `CONTAINS`: Input message contains the keyword substring (e.g. "What is your **price**?").
@@ -518,11 +522,21 @@ Base path: `/api/v1/automations`
 * `ALL`: Input message contains all specified keywords.
 
 #### Action Step Types (`stepType`)
-* `SEND_DM`: Sends a private text message to contact's Instagram Direct inbox.
-* `REPLY_COMMENT`: Posts a public comment reply. Supports a list of randomized templates in `content.replies` to prevent Meta anti-spam flagging.
-* `QUICK_REPLIES`: Sends a DM with interactive CTA buttons.
+* `SEND_DM` / `SEND_MESSAGE`: Sends a private text message to contact's Instagram Direct or WhatsApp chat.
+* `SEND_MEDIA`: Sends an image, video, audio, or document file (`content.mediaUrl`, `content.mediaType`, `content.caption`).
+* `QUICK_REPLIES`: Sends interactive CTA buttons (rendered as interactive buttons on Instagram or numbered quick menu on WhatsApp).
 * `DELAY`: Pauses execution for `delaySeconds` (e.g. 2s to 5s) to simulate natural human typing.
 * `ADD_TAG`: Attaches a CRM tag (`content.tag`) to the contact's database record.
+* `REPLY_COMMENT`: Posts a public comment reply (Instagram only). Supports a list of randomized templates in `content.replies` to prevent Meta anti-spam flagging.
+
+#### 🛡️ WhatsApp Automation Anti-Ban Rules
+1. **Device Fingerprint:** macOS · Chrome official desktop client identity.
+2. **Humanized Typing:** Natural `composing` typing state (1000–1800ms) before every automated reply.
+3. **Strict Rate Limiting:** Enforced cap of maximum 20 outgoing messages per minute per channel.
+4. **Inter-message Cooldown:** Minimum 1.5s natural spacing between consecutive outgoing messages.
+5. **Pre-flight onWhatsApp Check:** Verifies recipient JID registration on WhatsApp before sending.
+6. **Self & Broadcast Suppression:** Automatically ignores outgoing echoes (`fromMe`) and story status broadcasts (`status@broadcast`).
+7. **Anti-Flood Window:** 3-second deduplication lock per sender to prevent looping or rapid bounce.
 
 ---
 
@@ -532,9 +546,11 @@ Retrieve all automations created by the user with optional filters.
 - **Method:** `GET`
 - **Path:** `/api/v1/automations`
 - **Query Parameters:**
+  * `channelType` *(optional)*: Filter by `INSTAGRAM` or `WHATSAPP`.
   * `channelId` *(optional)*: Filter by connected Instagram channel UUID.
+  * `whatsAppChannelId` *(optional)*: Filter by connected WhatsApp channel UUID.
   * `status` *(optional)*: `ACTIVE`, `PAUSED`, or `DRAFT`.
-  * `triggerType` *(optional)*: e.g. `COMMENT_KEYWORD`, `DM_KEYWORD`, `STORY_MENTION`.
+  * `triggerType` *(optional)*: e.g. `DM_KEYWORD`, `WELCOME_MESSAGE`, `FALLBACK_DEFAULT`.
   * `search` *(optional)*: Search string matching name or description.
 
 #### Success Response (`200 OK`)

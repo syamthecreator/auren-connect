@@ -6,8 +6,11 @@ class Automation {
     required this.id,
     this.name = '',
     this.description,
+    this.channelType = 'INSTAGRAM',
     this.channelId,
     this.channelUsername,
+    this.whatsAppChannelId,
+    this.whatsAppNumber,
     this.trigger = TriggerType.commentKeyword,
     List<String>? keywords,
     this.exactMatch = false,
@@ -27,8 +30,11 @@ class Automation {
   final String id;
   String name;
   String? description;
+  String channelType; // 'INSTAGRAM' or 'WHATSAPP'
   String? channelId;
   String? channelUsername;
+  String? whatsAppChannelId;
+  String? whatsAppNumber;
   TriggerType trigger;
   List<String> keywords;
   bool exactMatch;
@@ -43,19 +49,28 @@ class Automation {
   DateTime? createdAt;
   DateTime? updatedAt;
 
+  bool get isWhatsApp => channelType == 'WHATSAPP';
+  bool get isInstagram => channelType == 'INSTAGRAM';
+
   Automation copy({
     String? id,
     String? name,
     String? description,
+    String? channelType,
     String? channelId,
     String? channelUsername,
+    String? whatsAppChannelId,
+    String? whatsAppNumber,
   }) {
     return Automation(
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
+      channelType: channelType ?? this.channelType,
       channelId: channelId ?? this.channelId,
       channelUsername: channelUsername ?? this.channelUsername,
+      whatsAppChannelId: whatsAppChannelId ?? this.whatsAppChannelId,
+      whatsAppNumber: whatsAppNumber ?? this.whatsAppNumber,
       trigger: trigger,
       keywords: List<String>.of(keywords),
       exactMatch: exactMatch,
@@ -74,7 +89,10 @@ class Automation {
 
   Map<String, dynamic> toBackend() {
     return {
+      'channelType': channelType,
       if (channelId != null && channelId!.isNotEmpty) 'channelId': channelId,
+      if (whatsAppChannelId != null && whatsAppChannelId!.isNotEmpty)
+        'whatsAppChannelId': whatsAppChannelId,
       'name': name.trim().isEmpty ? 'Untitled automation' : name.trim(),
       if (description != null) 'description': description,
       'triggerType': trigger.toBackend(),
@@ -91,6 +109,7 @@ class Automation {
 
   factory Automation.fromBackend(Map<String, dynamic> json) {
     final channelData = json['channel'] as Map<String, dynamic>?;
+    final waChannelData = json['whatsAppChannel'] as Map<String, dynamic>?;
     final rawSteps = json['steps'] as List<dynamic>? ?? [];
 
     final steps = rawSteps
@@ -101,8 +120,12 @@ class Automation {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString(),
+      channelType: json['channelType']?.toString() ?? 'INSTAGRAM',
       channelId: json['channelId']?.toString(),
       channelUsername: channelData?['username']?.toString(),
+      whatsAppChannelId: json['whatsAppChannelId']?.toString(),
+      whatsAppNumber: waChannelData?['phoneNumber']?.toString() ??
+          waChannelData?['name']?.toString(),
       trigger: TriggerTypeSerialization.fromBackend(
         json['triggerType']?.toString() ?? 'COMMENT_KEYWORD',
       ),

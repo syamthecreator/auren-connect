@@ -9,14 +9,22 @@ class AutomationApiService {
 
   /// Fetch all automations for the authenticated user, with optional filters.
   Future<List<Automation>> getAutomations({
+    String? channelType,
     String? channelId,
+    String? whatsAppChannelId,
     String? status,
     String? triggerType,
     String? search,
   }) async {
     final queryParameters = <String, String>{};
+    if (channelType != null && channelType.isNotEmpty) {
+      queryParameters['channelType'] = channelType;
+    }
     if (channelId != null && channelId.isNotEmpty) {
       queryParameters['channelId'] = channelId;
+    }
+    if (whatsAppChannelId != null && whatsAppChannelId.isNotEmpty) {
+      queryParameters['whatsAppChannelId'] = whatsAppChannelId;
     }
     if (status != null && status.isNotEmpty) {
       queryParameters['status'] = status;
