@@ -343,6 +343,157 @@ HTTP Status `200 OK`.
 
 ---
 
+## 📱 2B. WhatsApp Channel Connection (Linked Device QR Code) Endpoints
+
+Base path: `/api/v1/whatsapp`  
+*(All endpoints require `Authorization: Bearer <ACCESS_TOKEN>`)*
+
+### 💡 WhatsApp Web Linked Device Architecture & Anti-Ban Protection
+- **Official Browser Signature:** Identifies to WhatsApp servers as Google Chrome on Mac OS (`['Mac OS', 'Chrome', '124.0.6367.91']`), matching official WhatsApp Web.
+- **Keep Your Phone Working:** Connects via official multi-device protocol — your personal/business WhatsApp continues to work normally on your phone at all times.
+- **Zero Third-Party Fees:** Connects directly without paying per-number BSP middleware fees.
+- **Multi-Account Support:** Connect multiple WhatsApp numbers per user workspace.
+
+---
+
+### 2B.1 List Connected WhatsApp Channels
+Fetch all active and pending WhatsApp channels for the authenticated user.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/whatsapp/channels`
+- **Auth Required:** Yes (`Bearer <ACCESS_TOKEN>`)
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "channels": [
+      {
+        "id": "wa-ch-1234-5678",
+        "userId": "user-uuid",
+        "phoneNumber": "919876543210",
+        "jid": "919876543210@s.whatsapp.net",
+        "name": "Auren Support",
+        "profilePic": "https://pps.whatsapp.net/v/...",
+        "status": "CONNECTED",
+        "connectedAt": "2026-11-13T11:45:00.000Z",
+        "createdAt": "2026-11-13T11:40:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 2B.2 Initialize / Start QR Code Connection Session
+Spawns or retrieves an active WhatsApp Web multi-device socket. Generates a live base64 PNG data URL that can be rendered directly by any image widget or web browser.
+
+- **Method:** `POST`
+- **Path:** `/api/v1/whatsapp/connect`
+- **Auth Required:** Yes (`Bearer <ACCESS_TOKEN>`)
+
+#### Request Body (Optional)
+```json
+{
+  "channelId": "wa-ch-1234-5678"
+}
+```
+*(Leave body empty `{}` to connect a new number, or pass `channelId` to refresh QR for an existing connecting session)*
+
+#### Success Response (`200 OK` - Waiting for Scan)
+```json
+{
+  "success": true,
+  "data": {
+    "channelId": "wa-ch-1234-5678",
+    "status": "SCAN_QR",
+    "qrCodeBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+    "qrCodeString": "2@bCdef1234567..."
+  }
+}
+```
+
+#### Success Response (`200 OK` - Already Connected)
+```json
+{
+  "success": true,
+  "data": {
+    "channelId": "wa-ch-1234-5678",
+    "status": "CONNECTED",
+    "channel": {
+      "id": "wa-ch-1234-5678",
+      "phoneNumber": "919876543210",
+      "name": "Auren Support",
+      "status": "CONNECTED"
+    }
+  }
+}
+```
+
+---
+
+### 2B.3 Poll QR Session Status
+Poll the connection status while the user is viewing the QR code on screen.
+
+- **Method:** `GET`
+- **Path:** `/api/v1/whatsapp/status/:channelId`
+- **Auth Required:** Yes (`Bearer <ACCESS_TOKEN>`)
+
+#### Success Response (`200 OK` - Connected)
+```json
+{
+  "success": true,
+  "data": {
+    "channelId": "wa-ch-1234-5678",
+    "status": "CONNECTED",
+    "channel": {
+      "id": "wa-ch-1234-5678",
+      "userId": "user-uuid",
+      "phoneNumber": "919876543210",
+      "jid": "919876543210@s.whatsapp.net",
+      "name": "Auren Support",
+      "profilePic": "https://pps.whatsapp.net/v/...",
+      "status": "CONNECTED",
+      "connectedAt": "2026-11-13T11:45:00.000Z",
+      "createdAt": "2026-11-13T11:40:00.000Z"
+    }
+  }
+}
+```
+
+#### Success Response (`200 OK` - Still Scanning)
+```json
+{
+  "success": true,
+  "data": {
+    "channelId": "wa-ch-1234-5678",
+    "status": "SCAN_QR",
+    "qrCodeBase64": "data:image/png;base64,..."
+  }
+}
+```
+
+---
+
+### 2B.4 Disconnect / Unlink WhatsApp Channel
+Gracefully logs out the WhatsApp Web multi-device session, clears keys from disk, and removes the channel from the database.
+
+- **Method:** `DELETE`
+- **Path:** `/api/v1/whatsapp/channels/:channelId`
+- **Auth Required:** Yes (`Bearer <ACCESS_TOKEN>`)
+
+#### Success Response (`200 OK`)
+```json
+{
+  "success": true,
+  "message": "WhatsApp channel disconnected successfully"
+}
+```
+
+---
+
 ## 🤖 3. Messaging Automation Endpoints
 
 Base path: `/api/v1/automations`  
