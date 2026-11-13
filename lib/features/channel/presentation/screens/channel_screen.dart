@@ -378,10 +378,13 @@ class _ChannelScreenState extends State<ChannelScreen> {
       );
     }
 
-    void showWhatsAppConnectModal() {
+    void showWhatsAppConnectModal({String? channelId, String? phoneNumber}) {
       showDialog(
         context: context,
-        builder: (dialogContext) => const WhatsAppConnectDialog(),
+        builder: (dialogContext) => WhatsAppConnectDialog(
+          initialChannelId: channelId,
+          initialPhoneNumber: phoneNumber,
+        ),
       );
     }
 
@@ -603,11 +606,15 @@ class _ChannelScreenState extends State<ChannelScreen> {
                       ),
                       onCopyId: (id) => copyToClipboard(id, 'WhatsApp ID'),
                       onSync: isSyncing ? null : syncChannels,
+                      onReconnect: () => showWhatsAppConnectModal(
+                        channelId: waChannel.id,
+                        phoneNumber: waChannel.phoneNumber,
+                      ),
                     ),
                   )
                 else
                   _EmptyWhatsAppChannelCard(
-                    onConnect: showWhatsAppConnectModal,
+                    onConnect: () => showWhatsAppConnectModal(),
                   ),
               ],
             ],
@@ -1602,12 +1609,14 @@ class _WhatsAppChannelCard extends StatelessWidget {
     required this.onDisconnect,
     required this.onCopyId,
     required this.onSync,
+    this.onReconnect,
   });
 
   final WhatsAppChannelModel channel;
   final VoidCallback onDisconnect;
   final void Function(String) onCopyId;
   final VoidCallback? onSync;
+  final VoidCallback? onReconnect;
 
   @override
   Widget build(BuildContext context) {
@@ -1695,11 +1704,11 @@ class _WhatsAppChannelCard extends StatelessWidget {
                 ),
               ),
               StudioPill(
-                isConnected ? 'Active' : channel.status,
-                color: isConnected ? AppColors.waColor : AppColors.accent,
+                isConnected ? 'Active' : 'Disconnected',
+                color: isConnected ? AppColors.waColor : AppColors.error,
                 icon: isConnected
                     ? RemixIcons.checkbox_circle_fill
-                    : RemixIcons.loader_4_line,
+                    : RemixIcons.close_circle_line,
               ),
             ],
           ),
@@ -1780,6 +1789,30 @@ class _WhatsAppChannelCard extends StatelessWidget {
             ),
           ),
 
+          if (!isConnected) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.error.withValues(alpha: .3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(RemixIcons.error_warning_line, size: 16, color: AppColors.error),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Session disconnected. Reconnect via QR code or pairing code to restore messaging.',
+                      style: AppTextStyles.t(12, c: Colors.white70),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 22),
 
           // Footer Action Buttons
@@ -1788,12 +1821,51 @@ class _WhatsAppChannelCard extends StatelessWidget {
             children: [
               Text(
                 channel.connectedAt != null
-                    ? 'Connected ${_formatDate(channel.connectedAt!)}'
+                    ? (isConnected
+                        ? 'Connected ${_formatDate(channel.connectedAt!)}'
+                        : 'Disconnected')
                     : 'Active session',
-                style: AppTextStyles.t(12, c: AppColors.textMuted),
+                style: AppTextStyles.t(
+                  12,
+                  c: isConnected ? AppColors.textMuted : AppColors.error,
+                ),
               ),
               Row(
                 children: [
+                  if (onReconnect != null) ...[
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isConnected
+                            ? AppColors.surfaceVariant
+                            : AppColors.waColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: isConnected
+                                ? AppColors.border
+                                : Colors.transparent,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(RemixIcons.refresh_line, size: 15),
+                      label: Text(
+                        'Reconnect',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isConnected ? AppColors.textPrimary : Colors.white,
+                        ),
+                      ),
+                      onPressed: onReconnect,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   GhostButton(
                     label: 'Sync',
                     icon: RemixIcons.refresh_line,
@@ -1943,7 +2015,14 @@ class _EmptyWhatsAppChannelCard extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════════════
 
 class WhatsAppConnectDialog extends StatefulWidget {
-  const WhatsAppConnectDialog({super.key});
+  const WhatsAppConnectDialog({
+    super.key,
+    this.initialChannelId,
+    this.initialPhoneNumber,
+  });
+
+  final String? initialChannelId;
+  final String? initialPhoneNumber;
 
   @override
   State<WhatsAppConnectDialog> createState() => _WhatsAppConnectDialogState();
@@ -1966,6 +2045,11 @@ class _WhatsAppConnectDialogState extends State<WhatsAppConnectDialog> {
   @override
   void initState() {
     super.initState();
+    _channelId = widget.initialChannelId;
+    if (widget.initialPhoneNumber != null &&
+        widget.initialPhoneNumber!.isNotEmpty) {
+      _phoneController.text = widget.initialPhoneNumber!;
+    }
     _startSession();
   }
 
