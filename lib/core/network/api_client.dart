@@ -66,7 +66,6 @@ class ApiClient {
     try {
       final refreshToken = await tokenManager.getRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
-        await tokenManager.clearTokens();
         completer.complete(false);
         return false;
       }
@@ -104,8 +103,12 @@ class ApiClient {
         }
       }
 
-      // Refresh failed (e.g. token expired or revoked)
-      await tokenManager.clearTokens();
+      // Clear tokens only if server explicitly rejected the refresh token
+      if (response.statusCode == 400 ||
+          response.statusCode == 401 ||
+          response.statusCode == 403) {
+        await tokenManager.clearTokens();
+      }
       completer.complete(false);
       return false;
     } catch (_) {
@@ -132,6 +135,11 @@ class ApiClient {
       };
 
       if (requiresAuth) {
+        // If a refresh is in progress, wait for it before reading tokens
+        if (_refreshCompleter != null) {
+          await _refreshCompleter!.future;
+        }
+
         var token = await tokenManager.getAccessToken();
 
         // If access token is absent but refresh token exists, attempt refresh first

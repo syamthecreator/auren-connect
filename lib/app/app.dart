@@ -55,7 +55,8 @@ class AurenConnectApp extends StatelessWidget {
         ChangeNotifierProvider<InboxController>(
           create: (context) => InboxController(
             inboxApiService: context.read<InboxApiService>(),
-          )..loadConversations()..loadStats(),
+            tokenManager: context.read<AuthTokenManager>(),
+          ),
         ),
         ChangeNotifierProvider<SplashController>(
           create: (context) => SplashController(
@@ -70,7 +71,7 @@ class AurenConnectApp extends StatelessWidget {
         ChangeNotifierProvider<AutomationProvider>(
           create: (context) => AutomationProvider(
             automationApiService: context.read<AutomationApiService>(),
-          )..loadAutomations(),
+          ),
         ),
       ],
       child: MaterialApp(

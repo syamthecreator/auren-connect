@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:html' as html;
 
 import 'package:flutter/foundation.dart';
+import 'package:auren_connect/core/network/auth_token_manager.dart';
 
 import '../data/models/inbox_conversation_model.dart';
 import '../data/models/inbox_message_model.dart';
@@ -10,11 +11,10 @@ import '../data/models/inbox_stats_model.dart';
 import '../service/inbox_api_service.dart';
 
 class InboxController extends ChangeNotifier {
-  InboxController({this.inboxApiService}) {
-    _startPolling();
-  }
+  InboxController({this.inboxApiService, this.tokenManager});
 
   final InboxApiService? inboxApiService;
+  final AuthTokenManager? tokenManager;
 
   List<InboxConversationModel> _conversations = [];
   final Map<String, List<InboxMessageModel>> _messagesByContact = {};
@@ -156,21 +156,32 @@ class InboxController extends ChangeNotifier {
     }).toList();
   }
 
-  void _startPolling() {
+  void startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (inboxApiService != null) {
-        loadConversations(silent: true);
-        if (_selectedConversationId != null) {
-          loadMessages(_selectedConversationId!, silent: true);
+    _pollingTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
+      if (inboxApiService == null) return;
+      if (tokenManager != null) {
+        final hasSession = await tokenManager!.hasValidSession();
+        if (!hasSession) {
+          stopPolling();
+          return;
         }
+      }
+      loadConversations(silent: true);
+      if (_selectedConversationId != null) {
+        loadMessages(_selectedConversationId!, silent: true);
       }
     });
   }
 
+  void stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    stopPolling();
     for (final player in _audioPlayers.values) {
       player.pause();
     }
@@ -183,6 +194,12 @@ class InboxController extends ChangeNotifier {
   Future<void> loadStats() async {
     final api = inboxApiService;
     if (api == null) return;
+
+    if (tokenManager != null) {
+      final hasSession = await tokenManager!.hasValidSession();
+      if (!hasSession) return;
+    }
+
     try {
       final res = await api.getStats();
       _stats = res;
@@ -196,6 +213,17 @@ class InboxController extends ChangeNotifier {
   Future<void> loadConversations({bool silent = false}) async {
     final api = inboxApiService;
     if (api == null) return;
+
+    if (tokenManager != null) {
+      final hasSession = await tokenManager!.hasValidSession();
+      if (!hasSession) {
+        if (!silent) {
+          _isLoadingConversations = false;
+          notifyListeners();
+        }
+        return;
+      }
+    }
 
     if (!silent) {
       _isLoadingConversations = true;
@@ -255,6 +283,17 @@ class InboxController extends ChangeNotifier {
   Future<void> loadMessages(String contactId, {bool silent = false}) async {
     final api = inboxApiService;
     if (api == null) return;
+
+    if (tokenManager != null) {
+      final hasSession = await tokenManager!.hasValidSession();
+      if (!hasSession) {
+        if (!silent) {
+          _isLoadingMessages = false;
+          notifyListeners();
+        }
+        return;
+      }
+    }
 
     if (!silent) {
       _isLoadingMessages = true;

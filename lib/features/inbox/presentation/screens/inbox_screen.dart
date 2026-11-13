@@ -29,10 +29,18 @@ class _InboxScreenState extends State<InboxScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final controller = context.read<InboxController>();
       controller.loadStats();
       controller.loadConversations();
+      controller.startPolling();
     });
+  }
+
+  @override
+  void dispose() {
+    context.read<InboxController>().stopPolling();
+    super.dispose();
   }
 
   @override

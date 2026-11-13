@@ -90,21 +90,24 @@ class SplashController extends ChangeNotifier {
     _isInitialized = true;
 
     try {
-      final hasToken = await _tokenManager.hasAccessToken();
+      final hasSession = await _tokenManager.hasValidSession();
 
       // OAuth callback: directly open the Channels page.
-      if (isOAuthReturn && hasToken) {
+      if (isOAuthReturn && hasSession) {
         await _initializeAuth();
-
-        return SplashDestination.channel;
+        if (_authController.isAuthenticated) {
+          return SplashDestination.channel;
+        }
       }
 
       // Run authentication validation alongside the splash animation.
       await Future.delayed(const Duration(milliseconds: 2000));
 
-      if (hasToken) {
+      if (hasSession) {
         await _initializeAuth();
-        return SplashDestination.dashboard;
+        if (_authController.isAuthenticated) {
+          return SplashDestination.dashboard;
+        }
       }
 
       return SplashDestination.auth;
