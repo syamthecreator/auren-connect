@@ -1201,11 +1201,11 @@ class _ChannelHeroBanner extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: igConnected
+                        color: (igConnected || waConnected)
                             ? AppColors.success
                             : AppColors.textMuted,
                         shape: BoxShape.circle,
-                        boxShadow: igConnected
+                        boxShadow: (igConnected || waConnected)
                             ? [
                                 BoxShadow(
                                   color: AppColors.success.withValues(
@@ -1227,11 +1227,11 @@ class _ChannelHeroBanner extends StatelessWidget {
                   value: igConnected ? igHandle : 'Disconnected',
                 ),
                 const SizedBox(height: 10),
-                const _StatusMiniRow(
+                _StatusMiniRow(
                   icon: RemixIcons.whatsapp_line,
                   color: AppColors.waColor,
                   label: 'WhatsApp',
-                  value: 'Coming Soon',
+                  value: waConnected ? waHandle : 'Disconnected',
                 ),
                 const SizedBox(height: 10),
                 _StatusMiniRow(
