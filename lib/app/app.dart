@@ -10,6 +10,7 @@ import 'package:auren_connect/features/channel/controller/channel_controller.dar
 import 'package:auren_connect/features/channel/service/channel_api_service.dart';
 import 'package:auren_connect/features/automation/service/automation_api_service.dart';
 import 'package:auren_connect/features/inbox/controller/inbox_controller.dart';
+import 'package:auren_connect/features/inbox/service/inbox_api_service.dart';
 import 'package:auren_connect/features/splash/controller/splash_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -47,8 +48,14 @@ class AurenConnectApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider<CoreUiProvider>(create: (_) => CoreUiProvider()),
+        Provider<InboxApiService>(
+          create: (context) =>
+              InboxApiService(apiClient: context.read<ApiClient>()),
+        ),
         ChangeNotifierProvider<InboxController>(
-          create: (_) => InboxController(),
+          create: (context) => InboxController(
+            inboxApiService: context.read<InboxApiService>(),
+          )..loadConversations()..loadStats(),
         ),
         ChangeNotifierProvider<SplashController>(
           create: (context) => SplashController(
