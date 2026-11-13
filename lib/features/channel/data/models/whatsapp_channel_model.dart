@@ -78,3 +78,4 @@ class WhatsAppChannelModel {
     };
   }
 }
+

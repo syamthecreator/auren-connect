@@ -2030,7 +2030,7 @@ class _WhatsAppConnectDialogState extends State<WhatsAppConnectDialog> {
         if (qr != null && qr != _qrCodeBase64) {
           setState(() => _qrCodeBase64 = qr);
         }
-        if (pair != null && pair != _pairingCode) {
+        if (pair != null && _pairingCode == null) {
           setState(() => _pairingCode = pair);
         }
 
@@ -2076,7 +2076,7 @@ class _WhatsAppConnectDialogState extends State<WhatsAppConnectDialog> {
     }
   }
 
-  Future<void> _requestPairingCode() async {
+  Future<void> _requestPairingCode({bool forceNew = false}) async {
     final phone = _phoneController.text.trim();
     if (phone.isEmpty) {
       AppSnackBar.error(
@@ -2084,6 +2084,10 @@ class _WhatsAppConnectDialogState extends State<WhatsAppConnectDialog> {
         'Please enter your phone number with country code',
       );
       return;
+    }
+
+    if (forceNew) {
+      setState(() => _pairingCode = null);
     }
 
     setState(() => _isRequestingPairing = true);
@@ -2520,7 +2524,7 @@ class _WhatsAppConnectDialogState extends State<WhatsAppConnectDialog> {
         if (_pairingCode != null) ...[
           const SizedBox(height: 20),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: AppColors.waColor.withValues(alpha: .1),
               borderRadius: BorderRadius.circular(16),
@@ -2530,26 +2534,62 @@ class _WhatsAppConnectDialogState extends State<WhatsAppConnectDialog> {
             ),
             child: Column(
               children: [
-                Text(
-                  'Your 8-Digit Pairing Code:',
-                  style: AppTextStyles.t(
-                    12,
-                    c: AppColors.waColor,
-                    w: FontWeight.w600,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      RemixIcons.shield_check_line,
+                      size: 14,
+                      color: AppColors.waColor,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Your 8-Digit Pairing Code (Valid for 10 min):',
+                      style: AppTextStyles.t(
+                        12,
+                        c: AppColors.waColor,
+                        w: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 SelectableText(
                   _pairingCode!,
                   style: const TextStyle(
                     fontFamily: 'monospace',
-                    fontSize: 26,
+                    fontSize: 28,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 4,
+                    letterSpacing: 5,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GhostButton(
+                      label: 'Copy Code',
+                      icon: RemixIcons.file_copy_line,
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: _pairingCode!));
+                        AppSnackBar.info(
+                          context,
+                          'Pairing code copied to clipboard',
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    GhostButton(
+                      label: 'Get New Code',
+                      icon: RemixIcons.refresh_line,
+                      onTap: _isRequestingPairing
+                          ? null
+                          : () => _requestPairingCode(forceNew: true),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
                 Text(
                   'A notification has been sent to your phone. Tap it or open WhatsApp > Linked Devices > Link with phone number instead, and enter this code.',
                   style: AppTextStyles.t(12, c: AppColors.textSecondary),
