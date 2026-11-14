@@ -8,6 +8,31 @@ class AuthApiService {
   final ApiClient _apiClient;
   final AuthTokenManager _tokenManager;
 
+  /// Register a new user account and immediately authenticate.
+  Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final response = await _apiClient.post(
+      ApiConstants.register,
+      body: {
+        'name': name.trim(),
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      },
+    );
+
+    if (response['success'] != true) {
+      throw ApiException(
+        message: response['message']?.toString() ?? 'Registration failed',
+      );
+    }
+
+    // Immediately log in to obtain session tokens
+    return await login(email: email, password: password);
+  }
+
   /// Login using backend credentials.
   /// Saves access and refresh tokens after successful authentication.
   Future<Map<String, dynamic>> login({

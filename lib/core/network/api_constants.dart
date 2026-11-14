@@ -15,4 +15,12 @@ abstract final class ApiConstants {
   static const String refresh = '$auth/refresh';
   static const String logout = '$auth/logout';
   static const String me = '$auth/me';
+
+  static const String plans = '/plans';
+  static const String workspaces = '/workspaces';
+  static const String myWorkspaces = '$workspaces/me';
+  static const String subscriptions = '/subscriptions';
+  static const String checkout = '$subscriptions/checkout';
+  static const String verifyPayment = '$subscriptions/verify';
+  static const String currentSubscription = '$subscriptions/current';
 }

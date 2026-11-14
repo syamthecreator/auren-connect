@@ -1,6 +1,3 @@
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
@@ -8,6 +5,7 @@ import 'package:remixicon/remixicon.dart';
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/app/theme/app_input_decorations.dart';
 import 'package:auren_connect/app/theme/app_text_styles.dart';
+import 'package:auren_connect/core/utils/web_helper.dart';
 import 'package:auren_connect/core/widgets/studio_card.dart';
 import 'package:auren_connect/core/widgets/studio_page.dart';
 import 'package:auren_connect/core/widgets/studio_pill.dart';
@@ -738,53 +736,28 @@ class _MessagePanelState extends State<_MessagePanel> {
   }
 
   void _pickAndUploadMedia({String? type}) {
-    final uploadInput = html.FileUploadInputElement();
-    if (type == 'audio') {
-      uploadInput.accept = 'audio/*';
-    } else if (type == 'image') {
-      uploadInput.accept = 'image/*';
-    } else if (type == 'video') {
-      uploadInput.accept = 'video/*';
-    } else if (type == 'file') {
-      uploadInput.accept = '.pdf,.doc,.docx,.xls,.xlsx,.txt';
-    } else {
-      uploadInput.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx';
-    }
-    uploadInput.click();
-
-    uploadInput.onChange.listen((e) {
-      final files = uploadInput.files;
-      if (files != null && files.isNotEmpty) {
-        final file = files[0];
-        final reader = html.FileReader();
-        reader.readAsDataUrl(file);
-        reader.onLoadEnd.listen((e) async {
-          final result = reader.result as String?;
-          if (result != null && result.isNotEmpty) {
-            final mime = file.type.isNotEmpty
-                ? file.type
-                : 'application/octet-stream';
-            final success = await widget.controller.uploadAndSendMedia(
-              contactId: widget.conversation.id,
-              fileBase64: result,
-              filename: file.name,
-              mimeType: mime,
-            );
-            if (!success && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    widget.controller.errorMessage ??
-                        'Failed to upload and send media',
-                  ),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            }
-          }
-        });
-      }
-    });
+    pickMediaFile(
+      type: type,
+      onLoaded: (result, fileName, mime) async {
+        final success = await widget.controller.uploadAndSendMedia(
+          contactId: widget.conversation.id,
+          fileBase64: result,
+          filename: fileName,
+          mimeType: mime,
+        );
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.controller.errorMessage ??
+                    'Failed to upload and send media',
+              ),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+    );
   }
 
   @override
@@ -836,15 +809,12 @@ class _MessagePanelState extends State<_MessagePanel> {
                                     conversation.jid?.split('@')[0] ??
                                     '';
                                 if (numOnly.isNotEmpty) {
-                                  html.window.open(
-                                    'https://wa.me/$numOnly',
-                                    '_blank',
-                                  );
+                                  openBrowserUrl('https://wa.me/$numOnly');
                                 }
                               } else {
                                 final url =
                                     'https://instagram.com/${conversation.username}';
-                                html.window.open(url, '_blank');
+                                openBrowserUrl(url);
                               }
                             },
                             child: Row(
@@ -1482,7 +1452,7 @@ class _MediaRenderer extends StatelessWidget {
                 right: 8,
                 bottom: 8,
                 child: InkWell(
-                  onTap: () => html.window.open(url, '_blank'),
+                  onTap: () => openBrowserUrl(url),
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -1546,7 +1516,7 @@ class _MediaRenderer extends StatelessWidget {
             IconButton(
               icon: const Icon(RemixIcons.external_link_line, size: 16),
               color: AppColors.primary,
-              onPressed: () => html.window.open(url, '_blank'),
+              onPressed: () => openBrowserUrl(url),
             ),
           ],
         ),
@@ -1584,7 +1554,7 @@ class _MediaRenderer extends StatelessWidget {
           IconButton(
             icon: const Icon(RemixIcons.download_line, size: 16),
             color: AppColors.primary,
-            onPressed: () => html.window.open(url, '_blank'),
+            onPressed: () => openBrowserUrl(url),
           ),
         ],
       ),
@@ -1641,7 +1611,7 @@ class _AudioMessagePlayer extends StatelessWidget {
           IconButton(
             icon: const Icon(RemixIcons.external_link_line, size: 14),
             color: AppColors.textMuted,
-            onPressed: () => html.window.open(url, '_blank'),
+            onPressed: () => openBrowserUrl(url),
           ),
         ],
       ),
@@ -1874,7 +1844,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
                       conv.jid?.split('@')[0] ??
                       '';
                   if (numOnly.isNotEmpty) {
-                    html.window.open('https://wa.me/$numOnly', '_blank');
+                    openBrowserUrl('https://wa.me/$numOnly');
                   }
                 },
                 icon: const Icon(RemixIcons.whatsapp_line, size: 16),
@@ -1895,7 +1865,7 @@ class _ContactDetailsSidebarState extends State<_ContactDetailsSidebar> {
                 ),
                 onPressed: () {
                   final url = 'https://instagram.com/${conv.username}';
-                  html.window.open(url, '_blank');
+                  openBrowserUrl(url);
                 },
                 icon: const Icon(RemixIcons.instagram_line, size: 16),
                 label: const Text('View Instagram Profile'),

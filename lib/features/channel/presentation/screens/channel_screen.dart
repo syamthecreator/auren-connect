@@ -1,7 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +8,7 @@ import 'package:remixicon/remixicon.dart';
 
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/app/theme/app_text_styles.dart';
+import 'package:auren_connect/core/utils/web_helper.dart';
 import 'package:auren_connect/core/widgets/app_snackbar.dart';
 import 'package:auren_connect/core/widgets/ghost_button.dart';
 import 'package:auren_connect/core/widgets/gradient_button.dart';
@@ -34,8 +33,8 @@ class ChannelScreen extends StatefulWidget {
 class _ChannelScreenState extends State<ChannelScreen> {
   // ── Meta connect flow state (moved here from ManyChatInstagramConnectView) ──
   Timer? _pollingTimer;
-  StreamSubscription<html.MessageEvent>? _messageSub;
-  dynamic _authPopup;
+  StreamSubscription<dynamic>? _messageSub;
+  WebPopupHandle? _authPopup;
   bool _connectionHandled = false;
 
   @override
@@ -76,8 +75,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
 
   void _listenForMetaCallback() {
     try {
-      _messageSub = html.window.onMessage.listen((event) {
-        final data = event.data;
+      _messageSub = listenWindowMessage((data) {
         bool isConnected = false;
         try {
           if (data == 'AUREN_INSTAGRAM_CONNECTED') {
@@ -128,11 +126,7 @@ class _ChannelScreenState extends State<ChannelScreen> {
 
     // Open popup immediately to avoid browser popup blockers.
     try {
-      _authPopup = html.window.open(
-        'about:blank',
-        'auren_meta_oauth',
-        'width=650,height=820,left=250,top=80,resizable=yes,scrollbars=yes',
-      );
+      _authPopup = openPopup('about:blank');
     } catch (_) {}
 
     final controller = context.read<ChannelController>();
@@ -160,10 +154,10 @@ class _ChannelScreenState extends State<ChannelScreen> {
     }
 
     // Redirect popup to Meta authorization.
-    try {
-      _authPopup?.location.href = url;
-    } catch (_) {
-      html.window.open(url, '_blank');
+    if (_authPopup != null) {
+      _authPopup!.setLocation(url);
+    } else {
+      openBrowserUrl(url);
     }
 
     _startPolling();

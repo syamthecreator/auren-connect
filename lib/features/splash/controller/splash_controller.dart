@@ -1,11 +1,8 @@
 import 'dart:async';
-
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/auth_token_manager.dart';
+import '../../../core/utils/web_helper.dart';
 import '../../auth/controllers/auth_controller.dart';
 
 enum SplashDestination { auth, dashboard, channel, popupClosed }
@@ -49,7 +46,7 @@ class SplashController extends ChangeNotifier {
   bool get isOAuthReturn {
     try {
       final uri = Uri.base;
-      final href = html.window.location.href;
+      final href = uri.toString();
 
       return uri.queryParameters['tab'] == 'channel' ||
           uri.queryParameters.containsKey('connected') ||
@@ -65,20 +62,7 @@ class SplashController extends ChangeNotifier {
   /// Handles OAuth popup callback.
   bool handleOAuthPopup() {
     if (!isOAuthReturn) return false;
-
-    try {
-      final opener = html.window.opener;
-
-      if (opener != null && !opener.closed!) {
-        opener.postMessage('AUREN_INSTAGRAM_CONNECTED', '*');
-        html.window.close();
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Splash OAuth popup error: $e');
-    }
-
-    return false;
+    return handleOAuthPopupClose();
   }
 
   /// Validates authentication and determines the next destination.

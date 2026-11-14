@@ -1,9 +1,7 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-
 import 'package:flutter/foundation.dart';
 import 'package:auren_connect/core/network/auth_token_manager.dart';
+import 'package:auren_connect/core/utils/web_helper.dart';
 
 import '../data/models/inbox_conversation_model.dart';
 import '../data/models/inbox_message_model.dart';
@@ -38,7 +36,7 @@ class InboxController extends ChangeNotifier {
 
   // UI state managed by this controller.
   bool _isSavingNotes = false;
-  final Map<String, html.AudioElement> _audioPlayers = {};
+  final Map<String, PlatformAudioPlayer> _audioPlayers = {};
   final Map<String, bool> _audioPlaying = {};
 
   // Getters
@@ -69,24 +67,23 @@ class InboxController extends ChangeNotifier {
   bool isAudioPlaying(String url) => _audioPlaying[url] ?? false;
 
   void toggleAudioPlayback(String url) {
-    final player = _audioPlayers.putIfAbsent(url, () {
-      final audio = html.AudioElement(url);
-      audio.onEnded.listen((_) {
-        _audioPlaying[url] = false;
-        notifyListeners();
-      });
-      audio.onError.listen((_) {
-        _audioPlaying[url] = false;
-        notifyListeners();
-      });
-      return audio;
-    });
+    final player = _audioPlayers.putIfAbsent(url, () => createAudioPlayer());
 
     if (_audioPlaying[url] ?? false) {
       player.pause();
       _audioPlaying[url] = false;
     } else {
-      player.play();
+      player.play(
+        url,
+        onEnded: () {
+          _audioPlaying[url] = false;
+          notifyListeners();
+        },
+        onError: () {
+          _audioPlaying[url] = false;
+          notifyListeners();
+        },
+      );
       _audioPlaying[url] = true;
     }
     notifyListeners();
@@ -183,7 +180,7 @@ class InboxController extends ChangeNotifier {
   void dispose() {
     stopPolling();
     for (final player in _audioPlayers.values) {
-      player.pause();
+      player.dispose();
     }
     _audioPlayers.clear();
     _audioPlaying.clear();

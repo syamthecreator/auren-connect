@@ -1,19 +1,25 @@
-import 'package:auren_connect/app/routes/app_router.dart';
-import 'package:auren_connect/app/theme/app_theme.dart';
-import 'package:auren_connect/core/controller/core_ui_provider.dart';
-import 'package:auren_connect/core/network/api_client.dart';
-import 'package:auren_connect/core/network/auth_token_manager.dart';
-import 'package:auren_connect/core/services/auth_api_service.dart';
-import 'package:auren_connect/features/auth/controllers/auth_controller.dart';
-import 'package:auren_connect/features/automation/controller/automation_provider.dart';
-import 'package:auren_connect/features/channel/controller/channel_controller.dart';
-import 'package:auren_connect/features/channel/service/channel_api_service.dart';
-import 'package:auren_connect/features/automation/service/automation_api_service.dart';
-import 'package:auren_connect/features/inbox/controller/inbox_controller.dart';
-import 'package:auren_connect/features/inbox/service/inbox_api_service.dart';
-import 'package:auren_connect/features/splash/controller/splash_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import 'routes/app_router.dart';
+import 'theme/app_theme.dart';
+import '../core/controller/core_ui_provider.dart';
+import '../core/network/api_client.dart';
+import '../core/network/auth_token_manager.dart';
+import '../core/services/auth_api_service.dart';
+import '../core/services/subscription_api_service.dart';
+import '../core/services/workspace_api_service.dart';
+import '../features/auth/controllers/auth_controller.dart';
+import '../features/automation/controller/automation_provider.dart';
+import '../features/automation/service/automation_api_service.dart';
+import '../features/channel/controller/channel_controller.dart';
+import '../features/channel/service/channel_api_service.dart';
+import '../features/inbox/controller/inbox_controller.dart';
+import '../features/inbox/service/inbox_api_service.dart';
+import '../features/pricing/controller/pricing_controller.dart';
+import '../features/splash/controller/splash_controller.dart';
+import '../features/subscription/controller/subscription_controller.dart';
+import '../features/workspace/controller/workspace_controller.dart';
 
 class AurenConnectApp extends StatelessWidget {
   const AurenConnectApp({super.key});
@@ -37,6 +43,31 @@ class AurenConnectApp extends StatelessWidget {
           create: (context) =>
               AuthController(authApiService: context.read<AuthApiService>())
                 ..initialize(),
+        ),
+        Provider<WorkspaceApiService>(
+          create: (context) => WorkspaceApiService(
+            apiClient: context.read<ApiClient>(),
+          ),
+        ),
+        ChangeNotifierProvider<WorkspaceController>(
+          create: (context) => WorkspaceController(
+            workspaceApiService: context.read<WorkspaceApiService>(),
+          )..loadWorkspaces(),
+        ),
+        Provider<SubscriptionApiService>(
+          create: (context) => SubscriptionApiService(
+            apiClient: context.read<ApiClient>(),
+          ),
+        ),
+        ChangeNotifierProvider<SubscriptionController>(
+          create: (context) => SubscriptionController(
+            subscriptionApiService: context.read<SubscriptionApiService>(),
+          ),
+        ),
+        ChangeNotifierProvider<PricingController>(
+          create: (context) => PricingController(
+            subscriptionApiService: context.read<SubscriptionApiService>(),
+          ),
         ),
         Provider<ChannelApiService>(
           create: (context) =>
@@ -80,7 +111,7 @@ class AurenConnectApp extends StatelessWidget {
         themeMode: ThemeMode.dark,
         theme: AppTheme.darkTheme,
         darkTheme: AppTheme.darkTheme,
-        initialRoute: AppRouter.splash,
+        initialRoute: AppRouter.landing,
         onGenerateRoute: AppRouter.generateRoute,
       ),
     );

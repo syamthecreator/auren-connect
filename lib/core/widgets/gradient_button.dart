@@ -34,14 +34,18 @@ class GradientButton extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
                 Icon(icon, size: 18, color: Colors.white),
                 const SizedBox(width: 8),
               ],
-              Text(
-                label,
-                style: AppTextStyles.t(14, w: FontWeight.w600, c: Colors.white),
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTextStyles.t(14, w: FontWeight.w600, c: Colors.white),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

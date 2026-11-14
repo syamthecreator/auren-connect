@@ -1,4 +1,6 @@
 import 'package:auren_connect/app/routes/app_router.dart';
+import 'package:auren_connect/app/theme/app_text_styles.dart';
+import 'package:auren_connect/features/workspace/controller/workspace_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -53,7 +55,15 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
 
     if (ok) {
-      Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+      final wsController = context.read<WorkspaceController>();
+      await wsController.loadWorkspaces();
+      if (!mounted) return;
+
+      if (wsController.hasWorkspace) {
+        Navigator.of(context).pushReplacementNamed(AppRouter.dashboard);
+      } else {
+        Navigator.of(context).pushReplacementNamed(AppRouter.workspaceOnboarding);
+      }
     } else if (auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -290,6 +300,36 @@ class _AuthScreenState extends State<AuthScreen> {
           loading: auth.isLoading,
           loadingLabel: 'Signing in...',
           onPressed: _signIn,
+        ),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "Don't have an account?",
+              style: AppTextStyles.t(13, w: FontWeight.w400, c: AppColors.textSecondary),
+            ),
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () => Navigator.of(context).pushNamed(AppRouter.pricing),
+              child: Text(
+                'Get Started',
+                style: AppTextStyles.t(13, w: FontWeight.w700, c: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => Navigator.of(context).pushReplacementNamed(AppRouter.landing),
+            icon: const Icon(RemixIcons.arrow_left_line, size: 14),
+            label: const Text('Back to Home'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.textMuted,
+              textStyle: AppTextStyles.t(12),
+            ),
+          ),
         ),
       ],
     );

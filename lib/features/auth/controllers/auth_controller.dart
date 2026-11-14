@@ -77,6 +77,50 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> signUp({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    _model = _model.copyWith(
+      isLoading: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    notifyListeners();
+
+    try {
+      final result = await _authApiService.register(
+        name: name,
+        email: email,
+        password: password,
+      );
+
+      final user = result['user'] as Map<String, dynamic>;
+
+      _model = _model.copyWith(
+        isLoading: false,
+        isAuthenticated: true,
+        userEmail: user['email'] as String?,
+        userRole: 'Creator',
+        successMessage: 'Account created successfully! Welcome to aurenConnect.',
+      );
+
+      notifyListeners();
+      return true;
+    } on ApiException catch (error) {
+      _model = _model.copyWith(isLoading: false, errorMessage: error.message);
+    } catch (_) {
+      _model = _model.copyWith(
+        isLoading: false,
+        errorMessage: 'Failed to create account. Please try again.',
+      );
+    }
+
+    notifyListeners();
+    return false;
+  }
+
   Future<bool> signIn(String identifier, String password) async {
     _model = _model.copyWith(
       isLoading: true,

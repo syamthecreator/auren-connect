@@ -1,12 +1,10 @@
-// ignore: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-
 import 'package:auren_connect/app/routes/app_router.dart';
 import 'package:auren_connect/app/theme/app_colors.dart';
 import 'package:auren_connect/core/controller/core_ui_provider.dart';
 import 'package:auren_connect/core/utils/shell_scope.dart';
 import 'package:auren_connect/core/widgets/app_sidebar.dart';
 import 'package:auren_connect/core/widgets/app_top_bar.dart';
+import 'package:auren_connect/core/widgets/logout_confirm_dialog.dart';
 import 'package:auren_connect/features/auth/controllers/auth_controller.dart';
 import 'package:auren_connect/features/automation/presentation/screens/automation_screen.dart';
 import 'package:auren_connect/features/channel/presentation/screens/channel_screen.dart';
@@ -39,7 +37,7 @@ class _AppShellState extends State<AppShell> {
     if (destination == null) {
       try {
         final uri = Uri.base;
-        final href = html.window.location.href;
+        final href = uri.toString();
 
         if (uri.queryParameters['tab'] == 'channel' ||
             uri.queryParameters.containsKey('connected') ||
@@ -62,8 +60,11 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  /// Handles logout.
+  /// Handles logout with confirmation.
   Future<void> _logout() async {
+    final confirmed = await LogoutConfirmDialog.show(context);
+    if (!confirmed || !mounted) return;
+
     await context.read<AuthController>().signOut();
 
     if (!mounted) return;
